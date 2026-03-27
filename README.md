@@ -86,9 +86,12 @@ uv venv && source .venv/bin/activate
 
 # 3. Edit config/variables.md with your values (see Configuration above)
 vi config/variables.md
+# Or open the whole repo in VS Code
+code .
 
-# 4. Edit the CONFIGURATION section in the script to match
-vi deploy-medicare-e2e.sh
+# 4. Drop your Medicare Part D zip file(s) into data/DemoZippedFiles/
+#    (1 to 11 zip files — the script auto-detects all years present)
+#    No need to edit the script — it reads config/variables.md automatically
 
 # 5. Login to Azure
 az login
@@ -109,9 +112,12 @@ cd skills-for-fabric-load-medicare-data
 
 # 2. Edit config/variables.md — set WS_ID and local file paths
 vi config/variables.md
+# Or open the whole repo in VS Code
+code .
 
-# 3. Edit the CONFIGURATION section in the script to match
-vi deploy-medicare-to-workspace.sh
+# 3. Drop your Medicare Part D zip file(s) into data/DemoZippedFiles/
+#    (1 to 11 zip files — the script auto-detects all years present)
+#    No need to edit the script — it reads config/variables.md automatically
 
 # 4. Login to Azure
 az login

@@ -19,11 +19,11 @@ LOCATION="westus3"
 SKU="F4"
 
 # Fabric Capacity
-CAPACITY_NAME="westus3f4skillsfghcpcli"
+CAPACITY_NAME="westus3f4skillsfghcpclineo3"
 FABRIC_CAPACITY_ID=""
 
 # Fabric Workspace
-WORKSPACE_NAME="MedicareSkillsF4ghcpcli"
+WORKSPACE_NAME="MedicareSkillsF4ghcpclineo3"
 
 # ── Both deployment paths ──
 
@@ -31,7 +31,7 @@ WORKSPACE_NAME="MedicareSkillsF4ghcpcli"
 WS_ID=""                                    # e.g. "dc7ad9cf-c461-4204-8b73-6c1fcb4aff18"
 
 # Lakehouse
-LAKEHOUSE_NAME="MedicareSkillsF4TerminalLHghcpcli2"
+LAKEHOUSE_NAME="MedicareSkillsF4TerminalLHghcpclineo3"
 LH_ID=""
 DELTA_SCHEMA="mcpd"
 DELTA_TABLE="medicarepartd"

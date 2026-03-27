@@ -21,22 +21,52 @@ set -euo pipefail
 # =============================================================================
 
 # ─── CONFIGURATION ───────────────────────────────────────────────────────────
-# Edit these values before running
+# Values are loaded from config/variables.md (bash code block).
+# You can override any value by setting it here after the source block.
 
-RESOURCE_GROUP="FabricCapacityWestUS3"
-LOCATION="westus3"
-SKU="F4"
-CAPACITY_NAME="westus3f4skillsfghcpcli"
-WORKSPACE_NAME="MedicareSkillsF4ghcpcli"
-LAKEHOUSE_NAME="MedicareSkillsF4TerminalLHghcpcli"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VARS_FILE="$SCRIPT_DIR/config/variables.md"
+
+if [[ -f "$VARS_FILE" ]]; then
+  # Extract the bash code block from variables.md using Python (BSD sed-safe)
+  _vars=$(python3 - "$VARS_FILE" <<'PYEOF'
+import sys, re
+content = open(sys.argv[1]).read()
+blocks = re.findall(r'```bash\n(.*?)```', content, re.DOTALL)
+for block in blocks:
+    for line in block.splitlines():
+        line = line.strip()
+        if re.match(r'^[A-Z_]+=', line) and not line.startswith('#'):
+            print(line)
+PYEOF
+)
+  eval "$_vars" 2>/dev/null || true
+fi
+
+# ── Override / set defaults for values not in variables.md ──
+RESOURCE_GROUP="${RESOURCE_GROUP:-FabricCapacityWestUS3}"
+LOCATION="${LOCATION:-westus3}"
+SKU="${SKU:-F4}"
+CAPACITY_NAME="${CAPACITY_NAME:-westus3f4skillsfghcpclineo}"
+WORKSPACE_NAME="${WORKSPACE_NAME:-MedicareSkillsF4ghcpclineo}"
+LAKEHOUSE_NAME="${LAKEHOUSE_NAME:-MedicareSkillsF4TerminalLHghcpclineo}"
 
 # Local paths to zip files and notebooks
-ZIP_SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)/data/DemoZippedFiles"
-NOTEBOOK_DIR="/Users/darwinschweitzer/sourceData/MedicarePartD/code/notebook"
+ZIP_SOURCE_DIR="$SCRIPT_DIR/data/DemoZippedFiles"
+NOTEBOOK_DIR="$SCRIPT_DIR/notebooks"
 
-# All 11 years of Medicare Part D files
-YEARS=(2013 2014 2015 2016 2017 2018 2019 2020 2021 2022 2023)
 FILE_PREFIX="Medicare_Part_D_Prescribers_by_Provider_and_Drug"
+
+# Years to process — auto-detected from zip files present in ZIP_SOURCE_DIR
+# Drop in 1 to 11 zip files and this will pick them all up automatically
+YEARS=()
+for _zip in "$ZIP_SOURCE_DIR"/${FILE_PREFIX}_*.zip; do
+  [[ -f "$_zip" ]] || continue
+  _year=$(basename "$_zip" .zip | grep -oE '[0-9]{4}$')
+  [[ -n "$_year" ]] && YEARS+=("$_year")
+done
+IFS=$'\n' YEARS=($(sort <<<"${YEARS[*]}")); unset IFS
+[[ ${#YEARS[@]} -gt 0 ]] || { echo "  ✗ FAILED: No zip files matching ${FILE_PREFIX}_YYYY.zip found in $ZIP_SOURCE_DIR"; exit 1; }
 
 # ─── HELPER FUNCTIONS ────────────────────────────────────────────────────────
 
@@ -85,7 +115,7 @@ ok "Logged in as $ADMIN_EMAIL (subscription: $SUBSCRIPTION_ID)"
 
 [[ -d "$ZIP_SOURCE_DIR" ]] || fail "Zip directory not found: $ZIP_SOURCE_DIR"
 ZIP_COUNT=$(ls "$ZIP_SOURCE_DIR"/*.zip 2>/dev/null | wc -l | tr -d ' ')
-ok "Found $ZIP_COUNT zip files in $ZIP_SOURCE_DIR"
+ok "Found $ZIP_COUNT zip file(s) in $ZIP_SOURCE_DIR — years: ${YEARS[*]}"
 
 [[ -d "$NOTEBOOK_DIR" ]] || fail "Notebook directory not found: $NOTEBOOK_DIR"
 [[ -f "$NOTEBOOK_DIR/UnzipMedicareFiles.ipynb" ]] || fail "UnzipMedicareFiles.ipynb not found"
@@ -108,29 +138,43 @@ fi
 
 log "Step 2 — Create Fabric Capacity ($CAPACITY_NAME, $SKU in $LOCATION)"
 
-az rest --method put \
+EXISTING_STATE=$(az rest \
   --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Fabric/capacities/$CAPACITY_NAME?api-version=2023-11-01" \
-  --body "{
-    \"location\": \"$LOCATION\",
-    \"sku\": {\"name\": \"$SKU\", \"tier\": \"Fabric\"},
-    \"properties\": {
-      \"administration\": {
-        \"members\": [\"$ADMIN_EMAIL\"]
-      }
-    }
-  }" > /dev/null 2>&1 || fail "Could not create capacity (may already exist or name conflict)"
+  --query "properties.state" --output tsv 2>/dev/null || echo "")
 
-# Wait for provisioning
-info "Waiting for capacity to provision..."
+if [[ -n "$EXISTING_STATE" ]]; then
+  ok "Capacity already exists (state: $EXISTING_STATE)"
+  if [[ "$EXISTING_STATE" == "Paused" ]]; then
+    info "Resuming paused capacity..."
+    az rest --method post \
+      --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Fabric/capacities/$CAPACITY_NAME/resume?api-version=2023-11-01" \
+      > /dev/null 2>&1 || fail "Could not resume capacity"
+  fi
+else
+  az rest --method put \
+    --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Fabric/capacities/$CAPACITY_NAME?api-version=2023-11-01" \
+    --body "{
+      \"location\": \"$LOCATION\",
+      \"sku\": {\"name\": \"$SKU\", \"tier\": \"Fabric\"},
+      \"properties\": {
+        \"administration\": {
+          \"members\": [\"$ADMIN_EMAIL\"]
+        }
+      }
+    }" > /dev/null 2>&1 || fail "Could not create capacity"
+fi
+
+# Wait for provisioning/resuming
+info "Waiting for capacity to be ready..."
 for i in {1..30}; do
   STATE=$(az rest \
     --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Fabric/capacities/$CAPACITY_NAME?api-version=2023-11-01" \
-    --query "properties.provisioningState" --output tsv 2>&1)
+    --query "properties.state" --output tsv 2>&1)
   echo "    [$i] $STATE"
-  [[ "$STATE" == "Succeeded" ]] && break
+  [[ "$STATE" == "Active" ]] && break
   sleep 10
 done
-[[ "$STATE" == "Succeeded" ]] || fail "Capacity provisioning did not succeed: $STATE"
+[[ "$STATE" == "Active" ]] || fail "Capacity not active: $STATE"
 
 # Get Fabric-scoped capacity ID
 FABRIC_CAPACITY_ID=$(az rest \
@@ -144,37 +188,51 @@ ok "Capacity ID: $FABRIC_CAPACITY_ID"
 
 log "Step 3 — Create Workspace ($WORKSPACE_NAME)"
 
-WS_ID=$(az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
+WS_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
   --url "https://api.fabric.microsoft.com/v1/workspaces" \
-  --body "{\"displayName\": \"$WORKSPACE_NAME\", \"capacityId\": \"$FABRIC_CAPACITY_ID\"}" \
-  --query "id" --output tsv)
+  --query "value[?displayName=='$WORKSPACE_NAME'].id | [0]" --output tsv 2>/dev/null || echo "")
 
-ok "Workspace ID: $WS_ID"
+if [[ -n "$WS_ID" ]]; then
+  ok "Workspace already exists: $WS_ID"
+else
+  WS_ID=$(az rest --method post \
+    --resource "https://api.fabric.microsoft.com" \
+    --url "https://api.fabric.microsoft.com/v1/workspaces" \
+    --body "{\"displayName\": \"$WORKSPACE_NAME\", \"capacityId\": \"$FABRIC_CAPACITY_ID\"}" \
+    --query "id" --output tsv)
+  ok "Workspace created: $WS_ID"
 
-# Verify capacity assignment
-info "Verifying capacity assignment..."
-for i in {1..10}; do
-  PROGRESS=$(az rest --resource "https://api.fabric.microsoft.com" \
-    --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID" \
-    --query "capacityAssignmentProgress" --output tsv)
-  [[ "$PROGRESS" == "Completed" ]] && break
-  sleep 5
-done
-[[ "$PROGRESS" == "Completed" ]] || fail "Capacity assignment not completed: $PROGRESS"
-ok "Capacity assignment completed"
+  # Verify capacity assignment
+  info "Verifying capacity assignment..."
+  for i in {1..10}; do
+    PROGRESS=$(az rest --resource "https://api.fabric.microsoft.com" \
+      --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID" \
+      --query "capacityAssignmentProgress" --output tsv)
+    [[ "$PROGRESS" == "Completed" ]] && break
+    sleep 5
+  done
+  [[ "$PROGRESS" == "Completed" ]] || fail "Capacity assignment not completed: $PROGRESS"
+  ok "Capacity assignment completed"
+fi
 
 # ─── STEP 4: CREATE LAKEHOUSE ───────────────────────────────────────────────
 
 log "Step 4 — Create Lakehouse ($LAKEHOUSE_NAME)"
 
-LH_ID=$(az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
+LH_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
   --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
-  --body "{\"displayName\": \"$LAKEHOUSE_NAME\", \"type\": \"Lakehouse\", \"creationPayload\": {\"enableSchemas\": true}}" \
-  --query "id" --output tsv)
+  --query "value[?displayName=='$LAKEHOUSE_NAME' && type=='Lakehouse'].id | [0]" --output tsv 2>/dev/null || echo "")
 
-ok "Lakehouse ID: $LH_ID"
+if [[ -n "$LH_ID" ]]; then
+  ok "Lakehouse already exists: $LH_ID"
+else
+  LH_ID=$(az rest --method post \
+    --resource "https://api.fabric.microsoft.com" \
+    --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
+    --body "{\"displayName\": \"$LAKEHOUSE_NAME\", \"type\": \"Lakehouse\", \"creationPayload\": {\"enableSchemas\": true}}" \
+    --query "id" --output tsv)
+  ok "Lakehouse created: $LH_ID"
+fi
 
 # ─── STEP 5: UPLOAD ZIP FILES TO ONELAKE ────────────────────────────────────
 
@@ -333,43 +391,50 @@ for nb, name in [(unzip_nb, 'UnzipMedicareFiles'), (load_nb, 'LoadMedicarePartDf
 
 PYEOF
 
-# Deploy UnzipMedicareFiles
-info "Deploying UnzipMedicareFiles..."
-az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
-  --body @$TMPDIR/UnzipMedicareFiles_deploy_body.json > /dev/null 2>&1
+deploy_or_update_notebook() {
+  local name=$1
+  local nb_id
+  nb_id=$(az rest --resource "https://api.fabric.microsoft.com" \
+    --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
+    --query "value[?displayName=='$name'].id | [0]" --output tsv 2>/dev/null || echo "")
 
-UNZIP_NB_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
-  --query "value[?displayName=='UnzipMedicareFiles'].id | [0]" --output tsv)
-ok "UnzipMedicareFiles deployed: $UNZIP_NB_ID"
+  if [[ -n "$nb_id" ]]; then
+    info "$name already exists, updating definition..." >&2
+    az rest --method post \
+      --resource "https://api.fabric.microsoft.com" \
+      --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$nb_id/updateDefinition" \
+      --body @$TMPDIR/${name}_update_body.json > /dev/null 2>&1
+    ok "$name updated: $nb_id" >&2
+  else
+    info "Deploying $name..." >&2
+    az rest --method post \
+      --resource "https://api.fabric.microsoft.com" \
+      --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
+      --body @$TMPDIR/${name}_deploy_body.json > /dev/null 2>&1
 
-# Deploy LoadMedicarePartDfiles
-info "Deploying LoadMedicarePartDfiles..."
-az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
-  --body @$TMPDIR/LoadMedicarePartDfiles_deploy_body.json > /dev/null 2>&1
+    # Retry until notebook appears (may take a few seconds after creation)
+    for i in {1..10}; do
+      nb_id=$(az rest --resource "https://api.fabric.microsoft.com" \
+        --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
+        --query "value[?displayName=='$name'].id | [0]" --output tsv 2>/dev/null || echo "")
+      [[ -n "$nb_id" ]] && break
+      sleep 5
+    done
+    [[ -n "$nb_id" ]] || { echo "  ✗ FAILED: Could not retrieve ID for $name after deployment" >&2; exit 1; }
+    ok "$name deployed: $nb_id" >&2
 
-LOAD_NB_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
-  --query "value[?displayName=='LoadMedicarePartDfiles'].id | [0]" --output tsv)
-ok "LoadMedicarePartDfiles deployed: $LOAD_NB_ID"
+    info "Binding $name to lakehouse..." >&2
+    az rest --method post \
+      --resource "https://api.fabric.microsoft.com" \
+      --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$nb_id/updateDefinition" \
+      --body @$TMPDIR/${name}_update_body.json > /dev/null 2>&1
+    ok "$name bound to lakehouse" >&2
+  fi
+  echo "$nb_id"
+}
 
-# Bind both to lakehouse via updateDefinition
-info "Binding notebooks to lakehouse..."
-az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$UNZIP_NB_ID/updateDefinition" \
-  --body @$TMPDIR/UnzipMedicareFiles_update_body.json > /dev/null 2>&1
-ok "UnzipMedicareFiles bound to lakehouse"
-
-az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$LOAD_NB_ID/updateDefinition" \
-  --body @$TMPDIR/LoadMedicarePartDfiles_update_body.json > /dev/null 2>&1
-ok "LoadMedicarePartDfiles bound to lakehouse"
+UNZIP_NB_ID=$(deploy_or_update_notebook "UnzipMedicareFiles")
+LOAD_NB_ID=$(deploy_or_update_notebook "LoadMedicarePartDfiles")
 
 # ─── STEP 7: RUN UNZIP NOTEBOOK ─────────────────────────────────────────────
 
