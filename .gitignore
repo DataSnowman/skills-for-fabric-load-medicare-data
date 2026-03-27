@@ -1,0 +1,16 @@
+# Data files (don't commit large zips/CSVs)
+*.zip
+*.csv
+*.parquet
+
+# Temp files from deployment
+/tmp/
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Azure/Fabric tokens
+*.token
+.env
