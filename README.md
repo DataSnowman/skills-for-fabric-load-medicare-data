@@ -2,7 +2,7 @@
 
 This guide documents the full process of provisioning Microsoft Fabric infrastructure and loading [Medicare Part D Prescribers by Provider and Drug](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug) data (2013–2023) into a Delta table using the Azure CLI and Fabric REST APIs.
 
-> This project uses skills and patterns from [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric).
+> This project was built using [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [GitHub Copilot CLI](https://docs.github.com/en/copilot) with skills and context from [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric).
 
 ## Prerequisites
 
@@ -67,10 +67,11 @@ The script runs these steps sequentially with polling, error handling, and a sum
 ```
 ├── README.md                         # This file
 ├── deploy-medicare-e2e.sh            # One-shot E2E automation script
+├── pyproject.toml                    # Python project config (for uv)
 ├── .gitignore
 ├── config/
 │   └── variables.md                  # All configurable names, IDs, and paths
-├── docs/
+├── context/                          # AI agent context files (Claude Code / Copilot CLI)
 │   ├── buildfabricworkspace.md       # Step-by-step infrastructure provisioning
 │   ├── LoadMedicareData.md           # Step-by-step data loading workflow
 │   └── updateDefinitionNotebookEndpoint.md
@@ -79,6 +80,43 @@ The script runs these steps sequentially with polling, error handling, and a sum
     ├── LoadMedicarePartDfiles.ipynb   # Spark notebook to load CSVs into Delta
     └── TestEnvNotebook.ipynb         # Environment test notebook
 ```
+
+---
+
+## Using with AI Coding Agents
+
+The files in `config/` and `context/` are designed to be read by AI coding agents. They provide the step-by-step knowledge an agent needs to provision Fabric infrastructure and load data.
+
+### Claude Code
+
+```bash
+# Clone both repos
+git clone https://github.com/microsoft/skills-for-fabric.git
+git clone https://github.com/DataSnowman/skills-for-fabric-load-medicare-data.git
+
+# Open this repo in Claude Code — it will read the context/ files automatically
+cd skills-for-fabric-load-medicare-data
+claude
+```
+
+### GitHub Copilot CLI
+
+```bash
+# Open in VS Code with Copilot enabled
+cd skills-for-fabric-load-medicare-data
+code .
+
+# Reference context files in your prompts, e.g.:
+# "Use variables.md to run buildfabricworkspace.md and then LoadMedicareData.md"
+```
+
+### Troubleshooting with skills-for-fabric
+
+The [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric) repo contains the Fabric-specific skills and MCP server setup that were used to create the context files in this repo. If you need to troubleshoot or extend the deployment:
+
+1. Clone `skills-for-fabric` alongside this repo
+2. Use its skills (e.g., `spark-authoring-cli`, `fabric-workspace-cli`) for deeper Fabric API guidance
+3. See its `mcp-setup/` folder for MCP server configuration
 
 ---
 
