@@ -8,11 +8,14 @@ This guide documents the full process of provisioning Microsoft Fabric infrastru
 
 - **Azure CLI** installed (`az --version`)
 - **Logged in** to Azure (`az login`)
-- **Python 3** available (for notebook preparation)
+- **Python 3.9+** available (`python3 --version`)
 - **Azure subscription** with permissions to create Resource Groups and Fabric capacities
+- **Bash shell** — macOS Terminal, Linux shell, or Windows WSL/Git Bash
 - **Local data files**:
   - 11 Medicare Part D zip files in a local directory — [Download data](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data) | [Data dictionary](https://data.cms.gov/resources/medicare-part-d-prescribers-by-provider-and-drug-data-dictionary)
   - `UnzipMedicareFiles.ipynb` and `LoadMedicarePartDfiles.ipynb` notebooks
+
+> **Windows users:** Run the script in [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) or Git Bash. Native PowerShell is not supported.
 
 ---
 
@@ -25,14 +28,17 @@ The fastest way to run the full deployment is with the E2E script. It handles al
 git clone https://github.com/DataSnowman/skills-for-fabric-load-medicare-data.git
 cd skills-for-fabric-load-medicare-data
 
-# 2. Edit the CONFIGURATION section in the script
+# 2. (Optional) Set up Python environment with uv
+uv venv && source .venv/bin/activate
+
+# 3. Edit the CONFIGURATION section in the script
 #    (resource group, capacity name, SKU, local file paths, etc.)
 vi deploy-medicare-e2e.sh
 
-# 3. Login to Azure
+# 4. Login to Azure
 az login
 
-# 4. Run it
+# 5. Run it
 chmod +x deploy-medicare-e2e.sh
 ./deploy-medicare-e2e.sh
 ```

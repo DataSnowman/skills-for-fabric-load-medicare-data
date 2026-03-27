@@ -45,6 +45,9 @@ info() { echo "  → $1"; }
 fail() { echo "  ✗ FAILED: $1"; exit 1; }
 ok()   { echo "  ✓ $1"; }
 
+# Cross-platform temp directory
+TMPDIR="${TMPDIR:-${TEMP:-/tmp}}"
+
 poll_job() {
   local ws_id=$1 item_id=$2 job_id=$3 label=$4 max_polls=${5:-120} interval=${6:-30}
   info "Polling $label (job $job_id)..."
@@ -212,6 +215,7 @@ ws_id = "$WS_ID"
 lh_id = "$LH_ID"
 lh_name = "$LAKEHOUSE_NAME"
 nb_dir = "$NOTEBOOK_DIR"
+tmpdir = "$TMPDIR"
 years = [$(IFS=,; echo "${YEARS[*]}")]
 file_prefix = "$FILE_PREFIX"
 
@@ -302,7 +306,7 @@ for nb, name in [(unzip_nb, 'UnzipMedicareFiles'), (load_nb, 'LoadMedicarePartDf
             ]
         }
     }
-    with open(f'/tmp/{name}_deploy_body.json', 'w') as f:
+    with open(f'{tmpdir}/{name}_deploy_body.json', 'w') as f:
         json.dump(body, f)
     print(f"  ✓ {name} deploy body ready")
 
@@ -323,7 +327,7 @@ for nb, name in [(unzip_nb, 'UnzipMedicareFiles'), (load_nb, 'LoadMedicarePartDf
             ]
         }
     }
-    with open(f'/tmp/{name}_update_body.json', 'w') as f:
+    with open(f'{tmpdir}/{name}_update_body.json', 'w') as f:
         json.dump(body, f)
     print(f"  ✓ {name} update body ready")
 
@@ -334,7 +338,7 @@ info "Deploying UnzipMedicareFiles..."
 az rest --method post \
   --resource "https://api.fabric.microsoft.com" \
   --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
-  --body @/tmp/UnzipMedicareFiles_deploy_body.json > /dev/null 2>&1
+  --body @$TMPDIR/UnzipMedicareFiles_deploy_body.json > /dev/null 2>&1
 
 UNZIP_NB_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
   --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
@@ -346,7 +350,7 @@ info "Deploying LoadMedicarePartDfiles..."
 az rest --method post \
   --resource "https://api.fabric.microsoft.com" \
   --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
-  --body @/tmp/LoadMedicarePartDfiles_deploy_body.json > /dev/null 2>&1
+  --body @$TMPDIR/LoadMedicarePartDfiles_deploy_body.json > /dev/null 2>&1
 
 LOAD_NB_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
   --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
@@ -358,13 +362,13 @@ info "Binding notebooks to lakehouse..."
 az rest --method post \
   --resource "https://api.fabric.microsoft.com" \
   --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$UNZIP_NB_ID/updateDefinition" \
-  --body @/tmp/UnzipMedicareFiles_update_body.json > /dev/null 2>&1
+  --body @$TMPDIR/UnzipMedicareFiles_update_body.json > /dev/null 2>&1
 ok "UnzipMedicareFiles bound to lakehouse"
 
 az rest --method post \
   --resource "https://api.fabric.microsoft.com" \
   --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$LOAD_NB_ID/updateDefinition" \
-  --body @/tmp/LoadMedicarePartDfiles_update_body.json > /dev/null 2>&1
+  --body @$TMPDIR/LoadMedicarePartDfiles_update_body.json > /dev/null 2>&1
 ok "LoadMedicarePartDfiles bound to lakehouse"
 
 # ─── STEP 7: RUN UNZIP NOTEBOOK ─────────────────────────────────────────────
@@ -419,4 +423,4 @@ echo "    GROUP BY [year]"
 echo ""
 
 # Clean up temp files
-rm -f /tmp/*_deploy_body.json /tmp/*_update_body.json
+rm -f "$TMPDIR"/*_deploy_body.json "$TMPDIR"/*_update_body.json

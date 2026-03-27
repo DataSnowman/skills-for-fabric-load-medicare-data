@@ -11,6 +11,10 @@
 .DS_Store
 Thumbs.db
 
+# Python venv
+.venv/
+__pycache__/
+
 # Azure/Fabric tokens
 *.token
 .env
