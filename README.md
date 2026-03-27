@@ -4,18 +4,6 @@ This guide documents the full process of provisioning Microsoft Fabric infrastru
 
 > This project uses skills and patterns from [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric).
 
-## Overview
-
-| Phase | Steps | Description |
-|---|---|---|
-| **Infrastructure** | 1–4 | Create Resource Group, Fabric Capacity, Workspace, and Lakehouse |
-| **Data Upload** | 5 | Upload 11 zip files (~8GB total) to OneLake |
-| **Notebooks** | 6 | Deploy and bind Spark notebooks to the Lakehouse |
-| **Execution** | 7–8 | Run Unzip and Load notebooks |
-| **Verification** | 9 | Confirm Delta table with ~275M rows across 11 years |
-
----
-
 ## Prerequisites
 
 - **Azure CLI** installed (`az --version`)
@@ -25,6 +13,66 @@ This guide documents the full process of provisioning Microsoft Fabric infrastru
 - **Local data files**:
   - 11 Medicare Part D zip files in a local directory
   - `UnzipMedicareFiles.ipynb` and `LoadMedicarePartDfiles.ipynb` notebooks
+
+---
+
+## Quick Start — One-Shot Automation
+
+The fastest way to run the full deployment is with the E2E script. It handles all 9 steps automatically:
+
+```bash
+# 1. Clone this repo
+git clone https://github.com/DataSnowman/skills-for-fabric-load-medicare-data.git
+cd skills-for-fabric-load-medicare-data
+
+# 2. Edit the CONFIGURATION section in the script
+#    (resource group, capacity name, SKU, local file paths, etc.)
+vi deploy-medicare-e2e.sh
+
+# 3. Login to Azure
+az login
+
+# 4. Run it
+chmod +x deploy-medicare-e2e.sh
+./deploy-medicare-e2e.sh
+```
+
+The script runs these steps sequentially with polling, error handling, and a summary at the end:
+
+| Step | What it does |
+|---|---|
+| 0 | Preflight checks (az login, files exist) |
+| 1 | Create Azure Resource Group (skips if exists) |
+| 2 | Create Fabric Capacity + wait for provisioning |
+| 3 | Create Workspace + verify capacity assignment |
+| 4 | Create Lakehouse (schemas enabled) |
+| 5 | Upload all zip files to OneLake (blob endpoint) |
+| 6 | Deploy both notebooks with lakehouse binding |
+| 7 | Run UnzipMedicareFiles notebook + poll until complete |
+| 8 | Run LoadMedicarePartDfiles notebook + poll until complete |
+| 9 | Verify Delta table exists |
+
+> **⚠️ Cost Warning:** This creates a billable Fabric capacity. Pause or delete the capacity when not in use.
+
+---
+
+## Repo Structure
+
+```
+├── README.md                         # This file
+├── deploy-medicare-e2e.sh            # One-shot E2E automation script
+├── .gitignore
+├── config/
+│   └── variables.md                  # All configurable names, IDs, and paths
+├── docs/
+│   ├── buildfabricworkspace.md       # Step-by-step infrastructure provisioning
+│   ├── LoadMedicareData.md           # Step-by-step data loading workflow
+│   └── updateDefinitionNotebookEndpoint.md
+└── notebooks/
+    ├── UnzipMedicareFiles.ipynb      # Spark notebook to extract zip files
+    ├── LoadMedicarePartDfiles.ipynb   # Spark notebook to load CSVs into Delta
+    └── TestEnvNotebook.ipynb         # Environment test notebook
+```
 
 ---
 
@@ -54,6 +102,12 @@ Auto-populate subscription and admin email after `az login`:
 SUBSCRIPTION_ID=$(az account show --query id --output tsv)
 ADMIN_EMAIL=$(az account show --query user.name --output tsv)
 ```
+
+---
+
+# Step-by-Step Reference
+
+> The sections below document each step in detail for manual execution or troubleshooting. If you used the one-shot script above, you can skip to [Verification](#step-9--verify-delta-table) or [Troubleshooting](#troubleshooting).
 
 ---
 
@@ -321,40 +375,6 @@ GROUP BY [year]
 | `GE65_Tot_Benes` | integer | 65+ total beneficiaries |
 | `filename` | string | Source file path (added by notebook) |
 | `year` | string | 4-digit year extracted from filename (added by notebook) |
-
----
-
-## Repo Structure
-
-```
-├── README.md                         # This file
-├── deploy-medicare-e2e.sh            # One-shot E2E automation script
-├── .gitignore
-├── config/
-│   └── variables.md                  # All configurable names, IDs, and paths
-├── docs/
-│   ├── buildfabricworkspace.md       # Step-by-step infrastructure provisioning
-│   ├── LoadMedicareData.md           # Step-by-step data loading workflow
-│   └── updateDefinitionNotebookEndpoint.md
-└── notebooks/
-    ├── UnzipMedicareFiles.ipynb      # Spark notebook to extract zip files
-    ├── LoadMedicarePartDfiles.ipynb   # Spark notebook to load CSVs into Delta
-    └── TestEnvNotebook.ipynb         # Environment test notebook
-```
-
-## One-Shot Automation
-
-A complete E2E script is available at [`deploy-medicare-e2e.sh`](deploy-medicare-e2e.sh). To run:
-
-```bash
-# 1. Edit the CONFIGURATION section at the top of the script
-# 2. Make executable
-chmod +x deploy-medicare-e2e.sh
-# 3. Run
-./deploy-medicare-e2e.sh
-```
-
-The script runs all 8 steps sequentially with polling, error handling, and a summary at the end.
 
 ---
 
