@@ -11,7 +11,7 @@ This guide documents the full process of provisioning Microsoft Fabric infrastru
 - **Python 3** available (for notebook preparation)
 - **Azure subscription** with permissions to create Resource Groups and Fabric capacities
 - **Local data files**:
-  - 11 Medicare Part D zip files in a local directory
+  - 11 Medicare Part D zip files in a local directory — [Download data](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data) | [Data dictionary](https://data.cms.gov/resources/medicare-part-d-prescribers-by-provider-and-drug-data-dictionary)
   - `UnzipMedicareFiles.ipynb` and `LoadMedicarePartDfiles.ipynb` notebooks
 
 ---
