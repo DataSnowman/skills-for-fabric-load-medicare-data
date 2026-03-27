@@ -1,0 +1,16 @@
+Place your Medicare Part D zip files in this directory.
+
+Download from: https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data
+
+Expected files (2013–2023):
+  MUP_DPR_RY24_P04_V10_DY23_NPIBN.zip
+  MUP_DPR_RY24_P04_V10_DY22_NPIBN.zip
+  MUP_DPR_RY23_P04_V10_DY21_NPIBN.zip
+  MUP_DPR_RY22_P04_V10_DY20_Ntnl.zip
+  MUP_DPR_RY21_P04_V10_DY19_NPIBN.zip
+  MUP_DPR_RY20_P04_V10_DY18_NPIBN.zip
+  MUP_DPR_RY19_P04_V10_DY17_NPIBN.zip
+  MUP_DPR_RY18_P04_V10_DY16_NPIBN.zip
+  MUP_DPR_RY17_P04_V10_DY15_NPIBN.zip
+  MUP_DPR_RY16_P04_V10_DY14_NPIBN.zip
+  MUP_DPR_RY15_P04_V10_DY13_NPIBN.zip

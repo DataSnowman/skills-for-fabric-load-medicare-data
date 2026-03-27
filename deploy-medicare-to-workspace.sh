@@ -32,7 +32,7 @@ WS_ID=""                                     # e.g. "dc7ad9cf-c461-4204-8b73-6c1
 LAKEHOUSE_NAME="MedicareSkillsTerminalLH"
 
 # Local paths to zip files and notebooks
-ZIP_SOURCE_DIR="/Users/darwinschweitzer/sourceData/MedicarePartD/data/DemoZippedFiles"
+ZIP_SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)/data/DemoZippedFiles"
 NOTEBOOK_DIR="/Users/darwinschweitzer/sourceData/MedicarePartD/code/notebook"
 
 # All 11 years of Medicare Part D files

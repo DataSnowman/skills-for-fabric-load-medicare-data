@@ -31,7 +31,7 @@ WORKSPACE_NAME="MedicareSkillsF4ghcpcli"
 LAKEHOUSE_NAME="MedicareSkillsF4TerminalLHghcpcli"
 
 # Local paths to zip files and notebooks
-ZIP_SOURCE_DIR="/Users/darwinschweitzer/sourceData/MedicarePartD/data/DemoZippedFiles"
+ZIP_SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)/data/DemoZippedFiles"
 NOTEBOOK_DIR="/Users/darwinschweitzer/sourceData/MedicarePartD/code/notebook"
 
 # All 11 years of Medicare Part D files
