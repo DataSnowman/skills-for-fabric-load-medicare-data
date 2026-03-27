@@ -1,11 +1,17 @@
 # Shared Variables
 
-Copy-paste these into your terminal before running any commands in `buildfabricworkspace.md` or `LoadMedicareData.md`, or source this file directly.
+Copy-paste these into your terminal before running any commands, or source this file directly.
+
+> **Two deployment paths:**
+> - **Full deployment** (`deploy-medicare-e2e.sh`) — Fill in all variables below
+> - **Existing workspace** (`deploy-medicare-to-workspace.sh`) — Only need `WS_ID`, `LAKEHOUSE_NAME`, data paths, and notebook paths
 
 ```bash
 # Azure Subscription
 SUBSCRIPTION_ID=""                          # auto-populated via: az account show --query id --output tsv
 ADMIN_EMAIL=""                              # auto-populated via: az account show --query user.name --output tsv
+
+# ── Full deployment only (skip if using existing workspace) ──
 
 # Resource Group & Location
 RESOURCE_GROUP="FabricCapacityWestUS3"      # Created automatically if it doesn't exist
@@ -18,7 +24,11 @@ FABRIC_CAPACITY_ID=""
 
 # Fabric Workspace
 WORKSPACE_NAME="MedicareSkillsF4ghcpcli"
-WS_ID=""
+
+# ── Both deployment paths ──
+
+# Workspace ID (auto-populated by full deploy; REQUIRED for existing workspace)
+WS_ID=""                                    # e.g. "dc7ad9cf-c461-4204-8b73-6c1fcb4aff18"
 
 # Lakehouse
 LAKEHOUSE_NAME="MedicareSkillsF4TerminalLHghcpcli2"

@@ -9,11 +9,13 @@ This guide documents the full process of provisioning Microsoft Fabric infrastru
 - **Azure CLI** installed (`az --version`)
 - **Logged in** to Azure (`az login`)
 - **Python 3.9+** available (`python3 --version`)
-- **Azure subscription** with permissions to create Resource Groups and Fabric capacities
 - **Bash shell** — macOS Terminal, Linux shell, or Windows WSL/Git Bash
+- **Microsoft Fabric** — one of the following:
+  - **Full deployment:** An Azure subscription with permissions to create Resource Groups and [Fabric capacities](https://learn.microsoft.com/en-us/fabric/enterprise/licenses) (F2 or higher)
+  - **Existing workspace:** Contributor (or higher) access to an existing Fabric workspace with a running capacity
 - **Local data files**:
   - 11 Medicare Part D zip files in a local directory — [Download data](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data) | [Data dictionary](https://data.cms.gov/resources/medicare-part-d-prescribers-by-provider-and-drug-data-dictionary)
-  - `UnzipMedicareFiles.ipynb` and `LoadMedicarePartDfiles.ipynb` notebooks
+  - `UnzipMedicareFiles.ipynb` and `LoadMedicarePartDfiles.ipynb` notebooks (included in `notebooks/`)
 
 > **Windows users:** Run the script in [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) or Git Bash. Native PowerShell is not supported.
 
@@ -21,7 +23,11 @@ This guide documents the full process of provisioning Microsoft Fabric infrastru
 
 ## Quick Start — One-Shot Automation
 
-The fastest way to run the full deployment is with the E2E script. It handles all 9 steps automatically:
+Choose the script that matches your situation:
+
+### Option A: Full Deployment (new infrastructure)
+
+Creates Resource Group → Capacity → Workspace → Lakehouse → loads data.
 
 ```bash
 # 1. Clone this repo
@@ -43,20 +49,42 @@ chmod +x deploy-medicare-e2e.sh
 ./deploy-medicare-e2e.sh
 ```
 
-The script runs these steps sequentially with polling, error handling, and a summary at the end:
+### Option B: Existing Workspace (Contributor access)
 
-| Step | What it does |
-|---|---|
-| 0 | Preflight checks (az login, files exist) |
-| 1 | Create Azure Resource Group (skips if exists) |
-| 2 | Create Fabric Capacity + wait for provisioning |
-| 3 | Create Workspace + verify capacity assignment |
-| 4 | Create Lakehouse (schemas enabled) |
-| 5 | Upload all zip files to OneLake (blob endpoint) |
-| 6 | Deploy both notebooks with lakehouse binding |
-| 7 | Run UnzipMedicareFiles notebook + poll until complete |
-| 8 | Run LoadMedicarePartDfiles notebook + poll until complete |
-| 9 | Verify Delta table exists |
+Use this if you already have a Resource Group, Fabric Capacity, and Workspace. Only needs your **Workspace ID**.
+
+```bash
+# 1. Clone this repo
+git clone https://github.com/DataSnowman/skills-for-fabric-load-medicare-data.git
+cd skills-for-fabric-load-medicare-data
+
+# 2. Edit the script — set WS_ID, LAKEHOUSE_NAME, and local file paths
+vi deploy-medicare-to-workspace.sh
+
+# 3. Login to Azure
+az login
+
+# 4. Run it
+chmod +x deploy-medicare-to-workspace.sh
+./deploy-medicare-to-workspace.sh
+```
+
+> To find your Workspace ID: open the workspace in the Fabric portal — the ID is in the URL: `https://app.fabric.microsoft.com/groups/<WORKSPACE_ID>/...`
+
+### What each script does
+
+| Step | Full (`deploy-medicare-e2e.sh`) | Existing (`deploy-medicare-to-workspace.sh`) |
+|---|---|---|
+| Preflight checks | ✅ | ✅ |
+| Create Resource Group | ✅ | — |
+| Create Fabric Capacity | ✅ | — |
+| Create Workspace | ✅ | — |
+| Create Lakehouse | ✅ | ✅ (Step 1) |
+| Upload zip files | ✅ | ✅ (Step 2) |
+| Deploy & bind notebooks | ✅ | ✅ (Step 3) |
+| Run Unzip notebook | ✅ | ✅ (Step 4) |
+| Run Load notebook | ✅ | ✅ (Step 5) |
+| Verify Delta table | ✅ | ✅ (Step 6) |
 
 > **⚠️ Cost Warning:** This creates a billable Fabric capacity. Pause or delete the capacity when not in use.
 
@@ -65,20 +93,21 @@ The script runs these steps sequentially with polling, error handling, and a sum
 ## Repo Structure
 
 ```
-├── README.md                         # This file
-├── deploy-medicare-e2e.sh            # One-shot E2E automation script
-├── pyproject.toml                    # Python project config (for uv)
+├── README.md                              # This file
+├── deploy-medicare-e2e.sh                 # Full deployment (creates all infrastructure)
+├── deploy-medicare-to-workspace.sh        # Existing workspace (Contributor access)
+├── pyproject.toml                         # Python project config (for uv)
 ├── .gitignore
 ├── config/
-│   └── variables.md                  # All configurable names, IDs, and paths
-├── context/                          # AI agent context files (Claude Code / Copilot CLI)
-│   ├── buildfabricworkspace.md       # Step-by-step infrastructure provisioning
-│   ├── LoadMedicareData.md           # Step-by-step data loading workflow
+│   └── variables.md                       # All configurable names, IDs, and paths
+├── context/                               # AI agent context files (Claude Code / Copilot CLI)
+│   ├── buildfabricworkspace.md            # Step-by-step infrastructure provisioning
+│   ├── LoadMedicareData.md                # Step-by-step data loading workflow
 │   └── updateDefinitionNotebookEndpoint.md
 └── notebooks/
-    ├── UnzipMedicareFiles.ipynb      # Spark notebook to extract zip files
-    ├── LoadMedicarePartDfiles.ipynb   # Spark notebook to load CSVs into Delta
-    └── TestEnvNotebook.ipynb         # Environment test notebook
+    ├── UnzipMedicareFiles.ipynb           # Spark notebook to extract zip files
+    ├── LoadMedicarePartDfiles.ipynb        # Spark notebook to load CSVs into Delta
+    └── TestEnvNotebook.ipynb              # Environment test notebook
 ```
 
 ---
