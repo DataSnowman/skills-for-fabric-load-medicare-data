@@ -11,13 +11,50 @@ This guide documents the full process of provisioning Microsoft Fabric infrastru
 - **Python 3.9+** available (`python3 --version`)
 - **Bash shell** — macOS Terminal, Linux shell, or Windows WSL/Git Bash
 - **Microsoft Fabric** — one of the following:
-  - **Full deployment:** An Azure subscription with permissions to create Resource Groups and [Fabric capacities](https://learn.microsoft.com/en-us/fabric/enterprise/licenses) (F2 or higher)
-  - **Existing workspace:** Contributor (or higher) access to an existing Fabric workspace with a running capacity
+  - **Full deployment:** An Azure subscription with permissions to create Resource Groups and [Fabric capacities](https://learn.microsoft.com/en-us/fabric/enterprise/licenses) (F4 or higher — F2 does not have sufficient Spark resources for these notebooks)
+  - **Existing workspace:** Contributor (or higher) access to an existing Fabric workspace on an F4+ capacity
 - **Local data files**:
   - 11 Medicare Part D zip files in a local directory — [Download data](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data) | [Data dictionary](https://data.cms.gov/resources/medicare-part-d-prescribers-by-provider-and-drug-data-dictionary)
   - `UnzipMedicareFiles.ipynb` and `LoadMedicarePartDfiles.ipynb` notebooks (included in `notebooks/`)
 
 > **Windows users:** Run the script in [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) or Git Bash. Native PowerShell is not supported.
+
+---
+
+## Configuration
+
+All configuration is managed in [`config/variables.md`](config/variables.md). **Edit this file before running either script.**
+
+| Variable | Full Deploy | Existing Workspace | Description |
+|---|---|---|---|
+| `RESOURCE_GROUP` | ✅ | — | Azure Resource Group name |
+| `LOCATION` | ✅ | — | Azure region (e.g., `westus3`) |
+| `SKU` | ✅ | — | Fabric capacity SKU (`F4` minimum) |
+| `CAPACITY_NAME` | ✅ | — | Globally unique, lowercase alphanumeric |
+| `WORKSPACE_NAME` | ✅ | — | Fabric workspace display name |
+| `WS_ID` | — | ✅ **Required** | Existing workspace GUID |
+| `LAKEHOUSE_NAME` | ✅ | ✅ | Lakehouse to create |
+| `ZIP_SOURCE_DIR` | ✅ | ✅ | Local path to zip files |
+| `NOTEBOOK_LOCAL_PATH` | ✅ | ✅ | Local path to `.ipynb` notebooks |
+
+```bash
+# Azure (full deploy only)
+RESOURCE_GROUP="FabricCapacityWestUS3"
+LOCATION="westus3"
+SKU="F4"
+
+# Fabric (full deploy only)
+CAPACITY_NAME="westus3f4skillsfghcpcli"
+WORKSPACE_NAME="MedicareSkillsF4ghcpcli"
+
+# Workspace ID (existing workspace only)
+WS_ID=""                                    # e.g. "dc7ad9cf-c461-4204-8b73-6c1fcb4aff18"
+
+# Both paths
+LAKEHOUSE_NAME="MedicareSkillsTerminalLH"
+ZIP_SOURCE_DIR="/path/to/your/zip/files"
+NOTEBOOK_LOCAL_PATH="/path/to/your/notebooks"
+```
 
 ---
 
@@ -37,14 +74,16 @@ cd skills-for-fabric-load-medicare-data
 # 2. (Optional) Set up Python environment with uv
 uv venv && source .venv/bin/activate
 
-# 3. Edit the CONFIGURATION section in the script
-#    (resource group, capacity name, SKU, local file paths, etc.)
+# 3. Edit config/variables.md with your values (see Configuration above)
+vi config/variables.md
+
+# 4. Edit the CONFIGURATION section in the script to match
 vi deploy-medicare-e2e.sh
 
-# 4. Login to Azure
+# 5. Login to Azure
 az login
 
-# 5. Run it
+# 6. Run it
 chmod +x deploy-medicare-e2e.sh
 ./deploy-medicare-e2e.sh
 ```
@@ -58,13 +97,16 @@ Use this if you already have a Resource Group, Fabric Capacity, and Workspace. O
 git clone https://github.com/DataSnowman/skills-for-fabric-load-medicare-data.git
 cd skills-for-fabric-load-medicare-data
 
-# 2. Edit the script — set WS_ID, LAKEHOUSE_NAME, and local file paths
+# 2. Edit config/variables.md — set WS_ID and local file paths
+vi config/variables.md
+
+# 3. Edit the CONFIGURATION section in the script to match
 vi deploy-medicare-to-workspace.sh
 
-# 3. Login to Azure
+# 4. Login to Azure
 az login
 
-# 4. Run it
+# 5. Run it
 chmod +x deploy-medicare-to-workspace.sh
 ./deploy-medicare-to-workspace.sh
 ```
@@ -146,35 +188,6 @@ The [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric
 1. Clone `skills-for-fabric` alongside this repo
 2. Use its skills (e.g., `spark-authoring-cli`, `fabric-workspace-cli`) for deeper Fabric API guidance
 3. See its `mcp-setup/` folder for MCP server configuration
-
----
-
-## Configuration
-
-All configuration is managed in [`config/variables.md`](config/variables.md). Key values:
-
-```bash
-# Azure
-RESOURCE_GROUP="FabricCapacityWestUS3"
-LOCATION="westus3"
-SKU="F4"
-
-# Fabric
-CAPACITY_NAME="westus3f4skillsfghcpcli"
-WORKSPACE_NAME="MedicareSkillsF4ghcpcli"
-LAKEHOUSE_NAME="MedicareSkillsF4TerminalLHghcpcli"
-
-# Local paths
-ZIP_SOURCE_DIR="/Users/darwinschweitzer/sourceData/MedicarePartD/data/DemoZippedFiles"
-NOTEBOOK_DIR="/Users/darwinschweitzer/sourceData/MedicarePartD/code/notebook"
-```
-
-Auto-populate subscription and admin email after `az login`:
-
-```bash
-SUBSCRIPTION_ID=$(az account show --query id --output tsv)
-ADMIN_EMAIL=$(az account show --query user.name --output tsv)
-```
 
 ---
 

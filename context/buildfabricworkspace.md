@@ -47,7 +47,7 @@ ADMIN_EMAIL=$(az account show --query user.name --output tsv)
 RESOURCE_GROUP="<your-resource-group>"       # e.g. FabricCapacityWestUS3
 CAPACITY_NAME="<your-capacity-name>"         # e.g. westus3f2viaskills
 LOCATION="<azure-region>"                    # e.g. westus3
-SKU="<sku>"                                  # e.g. F2, F4, F8, F16, F32, F64
+SKU="<sku>"                                  # F4 minimum (F2 lacks sufficient Spark resources)
 
 az rest --method put \
   --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Fabric/capacities/$CAPACITY_NAME?api-version=2023-11-01" \
