@@ -8,11 +8,11 @@ This guide documents the full process of provisioning Microsoft Fabric infrastru
 
 | Phase | Steps | Description |
 |---|---|---|
-| **Infrastructure** | 1–3 | Create Fabric Capacity, Workspace, and Lakehouse |
-| **Data Upload** | 4 | Upload 11 zip files (~8GB total) to OneLake |
-| **Notebooks** | 5 | Deploy and bind Spark notebooks to the Lakehouse |
-| **Execution** | 6–7 | Run Unzip and Load notebooks |
-| **Verification** | 8 | Confirm Delta table with ~275M rows across 11 years |
+| **Infrastructure** | 1–4 | Create Resource Group, Fabric Capacity, Workspace, and Lakehouse |
+| **Data Upload** | 5 | Upload 11 zip files (~8GB total) to OneLake |
+| **Notebooks** | 6 | Deploy and bind Spark notebooks to the Lakehouse |
+| **Execution** | 7–8 | Run Unzip and Load notebooks |
+| **Verification** | 9 | Confirm Delta table with ~275M rows across 11 years |
 
 ---
 
@@ -21,7 +21,7 @@ This guide documents the full process of provisioning Microsoft Fabric infrastru
 - **Azure CLI** installed (`az --version`)
 - **Logged in** to Azure (`az login`)
 - **Python 3** available (for notebook preparation)
-- **Resource Group** already exists in your Azure subscription
+- **Azure subscription** with permissions to create Resource Groups and Fabric capacities
 - **Local data files**:
   - 11 Medicare Part D zip files in a local directory
   - `UnzipMedicareFiles.ipynb` and `LoadMedicarePartDfiles.ipynb` notebooks
@@ -57,7 +57,19 @@ ADMIN_EMAIL=$(az account show --query user.name --output tsv)
 
 ---
 
-## Step 1 — Create Fabric Capacity
+## Step 1 — Create Resource Group
+
+Creates the Azure Resource Group if it doesn't already exist:
+
+```bash
+az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
+```
+
+> If you already have a Resource Group, just set `RESOURCE_GROUP` in `config/variables.md` to its name — the E2E script will skip creation.
+
+---
+
+## Step 2 — Create Fabric Capacity
 
 Creates an F4 Fabric capacity in your resource group. Capacity names must be globally unique, lowercase alphanumeric.
 
@@ -86,7 +98,7 @@ FABRIC_CAPACITY_ID=$(az rest \
 
 ---
 
-## Step 2 — Create Workspace
+## Step 3 — Create Workspace
 
 ```bash
 WS_ID=$(az rest --method post \
@@ -106,7 +118,7 @@ az rest --resource "https://api.fabric.microsoft.com" \
 
 ---
 
-## Step 3 — Create Lakehouse
+## Step 4 — Create Lakehouse
 
 Creates a schema-enabled Lakehouse:
 
@@ -120,7 +132,7 @@ LH_ID=$(az rest --method post \
 
 ---
 
-## Step 4 — Upload Zip Files to OneLake
+## Step 5 — Upload Zip Files to OneLake
 
 > **Important:** Use the **blob endpoint** (`onelake.blob.fabric.microsoft.com`), not the DFS endpoint. The DFS endpoint returns `IncorrectEndpointError` for blob-style PUT operations.
 
@@ -162,7 +174,7 @@ Expected response: `201` for each file. Upload time depends on file size and net
 
 ---
 
-## Step 5 — Deploy and Bind Notebooks
+## Step 6 — Deploy and Bind Notebooks
 
 ### How Lakehouse Binding Works
 
@@ -216,7 +228,7 @@ The lakehouse connection must be embedded in the **notebook's `metadata.dependen
 
 ---
 
-## Step 6 — Run Unzip Notebook
+## Step 7 — Run Unzip Notebook
 
 Submit the notebook job and poll for completion:
 
@@ -238,7 +250,7 @@ STATUS=$(az rest --resource "https://api.fabric.microsoft.com" \
 
 ---
 
-## Step 7 — Run Load Notebook
+## Step 8 — Run Load Notebook
 
 Same pattern as Step 6, using `$LOAD_NB_ID`. This step takes longer as it processes ~8GB of CSV data into Delta format.
 
@@ -252,7 +264,7 @@ JOB_ID=$(az rest --method post \
 
 ---
 
-## Step 8 — Verify Delta Table
+## Step 9 — Verify Delta Table
 
 Query the table in Fabric SQL:
 

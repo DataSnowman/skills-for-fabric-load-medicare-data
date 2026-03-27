@@ -8,7 +8,7 @@ SUBSCRIPTION_ID=""                          # auto-populated via: az account sho
 ADMIN_EMAIL=""                              # auto-populated via: az account show --query user.name --output tsv
 
 # Resource Group & Location
-RESOURCE_GROUP="FabricCapacityWestUS3"
+RESOURCE_GROUP="FabricCapacityWestUS3"      # Created automatically if it doesn't exist
 LOCATION="westus3"
 SKU="F4"
 

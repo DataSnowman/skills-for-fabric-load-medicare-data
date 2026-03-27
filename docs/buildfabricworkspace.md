@@ -12,7 +12,7 @@ Use this template to provision a new Microsoft Fabric Capacity, Workspace, and L
 
 - Azure CLI installed (`az --version`)
 - Logged in to Azure (`az login`)
-- An existing Azure Resource Group
+- An Azure subscription with permissions to create Resource Groups and Fabric capacities
 
 ---
 
@@ -24,7 +24,20 @@ az login
 
 ---
 
-## Step 2 — Create Fabric Capacity
+## Step 2 — Create Resource Group
+
+```bash
+RESOURCE_GROUP="<your-resource-group>"       # e.g. FabricCapacityWestUS3
+LOCATION="<azure-region>"                    # e.g. westus3
+
+az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
+```
+
+> If you already have a Resource Group, skip this step and set `RESOURCE_GROUP` to its name.
+
+---
+
+## Step 3 — Create Fabric Capacity
 
 > Capacity names must be globally unique, lowercase alphanumeric only.
 
@@ -51,7 +64,7 @@ az rest --method put \
 
 ---
 
-## Step 3 — Get Capacity ID
+## Step 4 — Get Capacity ID
 
 ```bash
 SUBSCRIPTION_ID=$(az account show --query id --output tsv)
@@ -76,7 +89,7 @@ echo "Fabric Capacity ID: $FABRIC_CAPACITY_ID"
 
 ---
 
-## Step 4 — Create Workspace
+## Step 5 — Create Workspace
 
 ```bash
 WORKSPACE_NAME="<your-workspace-name>"       # e.g. skills-for-fabric
@@ -92,7 +105,7 @@ echo "Workspace ID: $WS_ID"
 
 ---
 
-## Step 5 — Verify Capacity Assignment
+## Step 6 — Verify Capacity Assignment
 
 ```bash
 az rest --resource "https://api.fabric.microsoft.com" \
@@ -104,7 +117,7 @@ Wait until `capacityAssignmentProgress` is `"Completed"` before proceeding.
 
 ---
 
-## Step 6 — Create Lakehouse
+## Step 7 — Create Lakehouse
 
 ```bash
 LAKEHOUSE_NAME="<your-lakehouse-name>"       # e.g. TerminlLH
@@ -120,7 +133,7 @@ echo "Lakehouse ID: $LH_ID"
 
 ---
 
-## Step 7 — Verify Lakehouse
+## Step 8 — Verify Lakehouse
 
 ```bash
 az rest --resource "https://api.fabric.microsoft.com" \

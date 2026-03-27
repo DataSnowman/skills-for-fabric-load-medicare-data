@@ -4,9 +4,9 @@ set -euo pipefail
 # =============================================================================
 # deploy-medicare-e2e.sh
 #
-# End-to-end script to provision a Fabric Capacity, Workspace, and Lakehouse,
-# then upload Medicare Part D zip files, deploy notebooks, and load data into
-# a Delta table.
+# End-to-end script to provision an Azure Resource Group, Fabric Capacity,
+# Workspace, and Lakehouse, then upload Medicare Part D zip files, deploy
+# notebooks, and load data into a Delta table.
 #
 # Prerequisites:
 #   - Azure CLI installed (az --version)
@@ -89,9 +89,21 @@ ok "Found $ZIP_COUNT zip files in $ZIP_SOURCE_DIR"
 [[ -f "$NOTEBOOK_DIR/LoadMedicarePartDfiles.ipynb" ]] || fail "LoadMedicarePartDfiles.ipynb not found"
 ok "Both notebooks found"
 
-# ─── STEP 1: CREATE FABRIC CAPACITY ─────────────────────────────────────────
+# ─── STEP 1: CREATE RESOURCE GROUP ──────────────────────────────────────────
 
-log "Step 1 — Create Fabric Capacity ($CAPACITY_NAME, $SKU in $LOCATION)"
+log "Step 1 — Create Resource Group ($RESOURCE_GROUP in $LOCATION)"
+
+EXISTING_RG=$(az group show --name "$RESOURCE_GROUP" --query "name" --output tsv 2>/dev/null || echo "")
+if [[ -n "$EXISTING_RG" ]]; then
+  ok "Resource Group already exists, skipping creation"
+else
+  az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output none
+  ok "Resource Group created"
+fi
+
+# ─── STEP 2: CREATE FABRIC CAPACITY ─────────────────────────────────────────
+
+log "Step 2 — Create Fabric Capacity ($CAPACITY_NAME, $SKU in $LOCATION)"
 
 az rest --method put \
   --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Fabric/capacities/$CAPACITY_NAME?api-version=2023-11-01" \
@@ -125,9 +137,9 @@ FABRIC_CAPACITY_ID=$(az rest \
 
 ok "Capacity ID: $FABRIC_CAPACITY_ID"
 
-# ─── STEP 2: CREATE WORKSPACE ───────────────────────────────────────────────
+# ─── STEP 3: CREATE WORKSPACE ───────────────────────────────────────────────
 
-log "Step 2 — Create Workspace ($WORKSPACE_NAME)"
+log "Step 3 — Create Workspace ($WORKSPACE_NAME)"
 
 WS_ID=$(az rest --method post \
   --resource "https://api.fabric.microsoft.com" \
@@ -149,9 +161,9 @@ done
 [[ "$PROGRESS" == "Completed" ]] || fail "Capacity assignment not completed: $PROGRESS"
 ok "Capacity assignment completed"
 
-# ─── STEP 3: CREATE LAKEHOUSE ───────────────────────────────────────────────
+# ─── STEP 4: CREATE LAKEHOUSE ───────────────────────────────────────────────
 
-log "Step 3 — Create Lakehouse ($LAKEHOUSE_NAME)"
+log "Step 4 — Create Lakehouse ($LAKEHOUSE_NAME)"
 
 LH_ID=$(az rest --method post \
   --resource "https://api.fabric.microsoft.com" \
@@ -161,9 +173,9 @@ LH_ID=$(az rest --method post \
 
 ok "Lakehouse ID: $LH_ID"
 
-# ─── STEP 4: UPLOAD ZIP FILES TO ONELAKE ────────────────────────────────────
+# ─── STEP 5: UPLOAD ZIP FILES TO ONELAKE ────────────────────────────────────
 
-log "Step 4 — Upload zip files to OneLake (blob endpoint)"
+log "Step 5 — Upload zip files to OneLake (blob endpoint)"
 
 STORAGE_TOKEN=$(az account get-access-token \
   --resource "https://storage.azure.com" \
@@ -189,9 +201,9 @@ done
 [[ $UPLOAD_FAILURES -eq 0 ]] || fail "$UPLOAD_FAILURES file(s) failed to upload"
 ok "All zip files uploaded"
 
-# ─── STEP 5: PREPARE AND DEPLOY NOTEBOOKS ───────────────────────────────────
+# ─── STEP 6: PREPARE AND DEPLOY NOTEBOOKS ───────────────────────────────────
 
-log "Step 5 — Prepare and deploy notebooks with lakehouse binding"
+log "Step 6 — Prepare and deploy notebooks with lakehouse binding"
 
 python3 << PYEOF
 import json, base64, uuid, os
@@ -355,25 +367,25 @@ az rest --method post \
   --body @/tmp/LoadMedicarePartDfiles_update_body.json > /dev/null 2>&1
 ok "LoadMedicarePartDfiles bound to lakehouse"
 
-# ─── STEP 6: RUN UNZIP NOTEBOOK ─────────────────────────────────────────────
+# ─── STEP 7: RUN UNZIP NOTEBOOK ─────────────────────────────────────────────
 
-log "Step 6 — Run UnzipMedicareFiles notebook"
+log "Step 7 — Run UnzipMedicareFiles notebook"
 
 UNZIP_JOB_ID=$(submit_notebook_job "$WS_ID" "$UNZIP_NB_ID")
 [[ -n "$UNZIP_JOB_ID" ]] || fail "Could not submit unzip notebook job"
 poll_job "$WS_ID" "$UNZIP_NB_ID" "$UNZIP_JOB_ID" "UnzipMedicareFiles" 60 30
 
-# ─── STEP 7: RUN LOAD NOTEBOOK ──────────────────────────────────────────────
+# ─── STEP 8: RUN LOAD NOTEBOOK ──────────────────────────────────────────────
 
-log "Step 7 — Run LoadMedicarePartDfiles notebook"
+log "Step 8 — Run LoadMedicarePartDfiles notebook"
 
 LOAD_JOB_ID=$(submit_notebook_job "$WS_ID" "$LOAD_NB_ID")
 [[ -n "$LOAD_JOB_ID" ]] || fail "Could not submit load notebook job"
 poll_job "$WS_ID" "$LOAD_NB_ID" "$LOAD_JOB_ID" "LoadMedicarePartDfiles" 120 30
 
-# ─── STEP 8: VERIFY ─────────────────────────────────────────────────────────
+# ─── STEP 9: VERIFY ─────────────────────────────────────────────────────────
 
-log "Step 8 — Verify Delta table"
+log "Step 9 — Verify Delta table"
 
 STORAGE_TOKEN=$(az account get-access-token \
   --resource "https://storage.azure.com" \
