@@ -1,8 +1,18 @@
 # Load Medicare Part D Data — End-to-End Guide
 
-This guide documents the full process of provisioning Microsoft Fabric infrastructure and loading [Medicare Part D Prescribers by Provider and Drug](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug) data (2013–2023) into a Delta table using the Azure CLI and Fabric REST APIs.
+This guide documents the full process of provisioning Microsoft Fabric infrastructure and loading [Medicare Part D Prescribers by Provider and Drug](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug) data (2013–2023, ~275 M rows) into a Delta table using the Azure CLI and Fabric REST APIs.
 
 > This project was built using [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [GitHub Copilot CLI](https://docs.github.com/en/copilot) with skills and context from [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric).
+
+## Background — From GUI Clicks to Terminal Velocity
+
+Three years ago this same Medicare dataset was loaded into a Fabric Lakehouse through the portal UI — manually creating workspaces, uploading files, and clicking through notebooks one at a time. That original walkthrough is still available here:
+
+🔗 **[DataSnowman/fabriclakehouse](https://github.com/DataSnowman/fabriclakehouse/tree/main)** — the 2023 GUI-based approach
+
+This repo is the **Terminal Velocity** edition. Instead of portal clicks, every step — from creating the Azure Resource Group and Fabric Capacity to deploying notebooks and loading ~275 million rows — runs as a single shell script driven by AI coding agents in a terminal. What previously took an afternoon of point-and-click now executes end-to-end in minutes with one command.
+
+The key enabler is **AI in the terminal**: tools like [GitHub Copilot CLI](https://docs.github.com/en/copilot) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) can read the context files in this repo, orchestrate Azure CLI and Fabric REST API calls, troubleshoot errors in real time, and iterate until the pipeline succeeds — all without leaving the command line. Pair that with the reusable skills from [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric) and you get a fully automated, repeatable deployment that any developer can clone and run.
 
 ## Prerequisites
 
