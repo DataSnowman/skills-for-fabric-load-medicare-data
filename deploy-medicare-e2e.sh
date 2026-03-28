@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Strip Windows \r from az CLI output (needed when WSL calls the Windows az binary)
+az() { command az "$@" | tr -d '\r'; }
+
 # =============================================================================
 # deploy-medicare-e2e.sh
 #
@@ -75,8 +78,9 @@ info() { echo "  → $1"; }
 fail() { echo "  ✗ FAILED: $1"; exit 1; }
 ok()   { echo "  ✓ $1"; }
 
-# Cross-platform temp directory
-TMPDIR="${TMPDIR:-${TEMP:-/tmp}}"
+# Use a directory on the Windows filesystem so the Windows az binary can read files
+TMPDIR="$SCRIPT_DIR/.tmp"
+mkdir -p "$TMPDIR"
 
 poll_job() {
   local ws_id=$1 item_id=$2 job_id=$3 label=$4 max_polls=${5:-120} interval=${6:-30}
@@ -243,9 +247,23 @@ STORAGE_TOKEN=$(az account get-access-token \
   --query accessToken --output tsv)
 
 UPLOAD_FAILURES=0
+UPLOAD_SKIPPED=0
 for ZIP_FILE in "$ZIP_SOURCE_DIR"/*.zip; do
   FILENAME=$(basename "$ZIP_FILE")
   SIZE_MB=$(( $(stat -f%z "$ZIP_FILE" 2>/dev/null || stat --printf="%s" "$ZIP_FILE") / 1024 / 1024 ))
+
+  # Check if blob already exists (HEAD request)
+  HEAD_CODE=$(curl -s -o /dev/null -w "%{http_code}" -I \
+    -H "Authorization: Bearer $STORAGE_TOKEN" \
+    -H "x-ms-version: 2023-01-03" \
+    "https://onelake.blob.fabric.microsoft.com/$WS_ID/$LH_ID/Files/medicare/$FILENAME")
+
+  if [[ "$HEAD_CODE" == "200" ]]; then
+    echo "  Skipping $FILENAME (${SIZE_MB}MB) — already uploaded"
+    UPLOAD_SKIPPED=$((UPLOAD_SKIPPED + 1))
+    continue
+  fi
+
   echo -n "  Uploading $FILENAME (${SIZE_MB}MB)... "
 
   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
@@ -260,7 +278,7 @@ for ZIP_FILE in "$ZIP_SOURCE_DIR"/*.zip; do
 done
 
 [[ $UPLOAD_FAILURES -eq 0 ]] || fail "$UPLOAD_FAILURES file(s) failed to upload"
-ok "All zip files uploaded"
+ok "All zip files uploaded ($UPLOAD_SKIPPED skipped, already present)"
 
 # ─── STEP 6: PREPARE AND DEPLOY NOTEBOOKS ───────────────────────────────────
 
@@ -403,14 +421,14 @@ deploy_or_update_notebook() {
     az rest --method post \
       --resource "https://api.fabric.microsoft.com" \
       --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$nb_id/updateDefinition" \
-      --body @$TMPDIR/${name}_update_body.json > /dev/null 2>&1
+      --body "$(cat $TMPDIR/${name}_update_body.json)" > /dev/null 2>&1
     ok "$name updated: $nb_id" >&2
   else
     info "Deploying $name..." >&2
     az rest --method post \
       --resource "https://api.fabric.microsoft.com" \
       --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
-      --body @$TMPDIR/${name}_deploy_body.json > /dev/null 2>&1
+      --body "$(cat $TMPDIR/${name}_deploy_body.json)" > /dev/null 2>&1
 
     # Retry until notebook appears (may take a few seconds after creation)
     for i in {1..10}; do
@@ -427,7 +445,7 @@ deploy_or_update_notebook() {
     az rest --method post \
       --resource "https://api.fabric.microsoft.com" \
       --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$nb_id/updateDefinition" \
-      --body @$TMPDIR/${name}_update_body.json > /dev/null 2>&1
+      --body "$(cat $TMPDIR/${name}_update_body.json)" > /dev/null 2>&1
     ok "$name bound to lakehouse" >&2
   fi
   echo "$nb_id"

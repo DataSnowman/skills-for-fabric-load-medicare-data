@@ -5,6 +5,7 @@
 
 # Temp files from deployment
 /tmp/
+/.tmp/
 *.tmp
 
 # OS files
