@@ -31,6 +31,12 @@ The key enabler is **AI in the terminal**: tools like [GitHub Copilot CLI](https
 
 ---
 
+## Things to Consider
+
+If you only have time to load one or two of the zipfiles and not all 11 just download one or two and put them in the /data/DemoZippedFiles directory (or any other local directory) and just tell GitHub Copilot CLI or Claude Code that you only want to load way 2023 and 2022 and where they are.
+
+Also mention the md files that are in the context folder because buildfabricworkspace.md and LoadMedicareData.md will let the CLI or Claude code know what it needs to do.
+
 ## Configuration
 
 All configuration is managed in [`config/variables.md`](config/variables.md). **Edit this file before running either script.**
@@ -191,7 +197,7 @@ claude
 ```bash
 # Open in VS Code with Copilot enabled
 cd skills-for-fabric-load-medicare-data
-code .
+copilot
 
 # Reference context files in your prompts, e.g.:
 # "Use variables.md to run buildfabricworkspace.md and then LoadMedicareData.md"
@@ -493,6 +499,53 @@ GROUP BY [year]
 | Duplicate rows after re-run | Notebook uses `append` mode | Use `overwrite` mode or truncate table first |
 
 ---
+
+## Checking if things worked
+
+When the script completes successfully you might get something that looks like this in the terminal.
+
+All steps succeeded:
+
+
+| Resource  | Name                                    | ID         |
+ |-----------|----------------------------------------|------------|
+ | Capacity  | westus3f4skillsfghcpcliubunto           | 8110829b-  |
+ | Workspace | MedicareSkillsF4ghcpcliubuntu           | b8eee3e8-  |
+ | Lakehouse | MedicareSkillsF4TerminalLHghcpcliubuntu | f56e57b3-  |
+ | Table     | mcpd.medicarepartd                      | ✅ verified |
+
+---
+
+To verify the row count in Fabric SQL:
+```
+ SELECT [year], count(*) as numberofrows
+ FROM [<NameOfLakehouse>].[mcpd].[medicarepartd]
+ GROUP BY [year]
+``` 
+Here are some images of the Fabric screen shots
+
+Fabric Capacity
+
+![capacity](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/capacity.png)
+
+Fabric Workspace
+
+![workspace](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/workspace.png)
+
+Fabric Lakehouse Files and Tables
+
+![lakehouse](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/lakehouse.png)
+
+Fabric Notebooks
+
+![nbunzip](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbunzip.png)
+
+![nbload](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbload.png)
+
+Fabric SQL Analytics Endpoint
+
+![sqlep](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/sqlep.png)
+
 
 ## Notes
 
