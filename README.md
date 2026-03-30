@@ -16,6 +16,7 @@ The key enabler is **AI in the terminal**: tools like [GitHub Copilot CLI](https
 
 ## Prerequisites
 
+- **GitHub Copilot CLI** [Installing GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli) or **Claude Code** [Getting Started Quickstart](https://code.claude.com/docs/en/quickstart)
 - **Azure CLI** installed (`az --version`)
 - **Logged in** to Azure (`az login`)
 - **Python 3.9+** available (`python3 --version`)
