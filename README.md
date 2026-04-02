@@ -263,40 +263,34 @@ Here are some images of the Fabric screen shots
 Fabric Capacity
 
 
-![capacity](https://raw.githubusercontent.com/datasnowman/
-SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/capacity.png)
+![capacity](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/capacity.png)
 
 
 Fabric Workspace
 
 
-![workspace](https://raw.githubusercontent.com/datasnowman/
-SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/workspace.png)
+![workspace](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/workspace.png)
 
 
 Fabric Lakehouse Files and Tables
 
 
-![lakehouse](https://raw.githubusercontent.com/datasnowman/
-SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/lakehouse.png)
+![lakehouse](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/lakehouse.png)
 
 
 Fabric Notebooks
 
 
-![nbunzip](https://raw.githubusercontent.com/datasnowman/
-SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbunzip.png)
+![nbunzip](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbunzip.png)
 
 
-![nbload](https://raw.githubusercontent.com/datasnowman/
-SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbload.png)
+![nbload](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbload.png)
 
 
 Fabric SQL Analytics Endpoint
 
 
-![sqlep](https://raw.githubusercontent.com/datasnowman/
-SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/sqlep.png)
+![sqlep](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/sqlep.png)
 
 To verify the row count in Fabric SQL:
 ```
