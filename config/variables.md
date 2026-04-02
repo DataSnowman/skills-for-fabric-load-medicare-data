@@ -37,8 +37,8 @@ DELTA_SCHEMA="mcpd"
 DELTA_TABLE="medicarepartd"
 
 # Data Paths (local)
-ZIP_SOURCE_DIR="/Users/darwinschweitzer/sourceData/MedicarePartD/data/DemoZippedFiles"
-NOTEBOOK_LOCAL_PATH="/Users/darwinschweitzer/sourceData/MedicarePartD/code/notebook"
+ZIP_SOURCE_DIR="data/DemoZippedFiles"
+NOTEBOOK_LOCAL_PATH="notebooks"
 
 # OneLake Paths
 ONELAKE_ZIP_PATH="Files/medicare"

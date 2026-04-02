@@ -75,68 +75,125 @@ NOTEBOOK_LOCAL_PATH="/path/to/your/notebooks"
 
 ---
 
-## Quick Start — One-Shot Automation
+## Quick Start
 
-Choose the script that matches your situation:
+### Step 1 — Clone the Repo
 
-### Option A: Full Deployment (new infrastructure)
+```bash
+git clone https://github.com/DataSnowman/skills-for-fabric-load-medicare-data.git
+```
+
+### Step 2 — Change into the Repo Directory
+
+```bash
+cd skills-for-fabric-load-medicare-data
+```
+
+### Step 3 — (Optional) Open in VS Code
+
+If you prefer to edit the markdown files in VS Code:
+
+```bash
+code .
+```
+
+### Step 4 — Edit Configuration
+
+Open `config/variables.md` and set the values that match your environment:
+
+| Variable | What to set |
+|---|---|
+| `RESOURCE_GROUP` | Your Azure Resource Group name |
+| `CAPACITY_NAME` | A globally unique, lowercase alphanumeric Fabric capacity name |
+| `WORKSPACE_NAME` | Your Fabric workspace display name |
+| `LAKEHOUSE_NAME` | The Lakehouse to create |
+
+> **Existing workspace?** Just set `WS_ID` to your workspace GUID and skip the capacity/resource group fields.
+> To find your Workspace ID: open the workspace in the Fabric portal — the ID is in the URL: `https://app.fabric.microsoft.com/groups/<WORKSPACE_ID>/...`
+
+Also drop your Medicare Part D zip file(s) into `data/DemoZippedFiles/` (1 to 11 zip files — the scripts auto-detect all years present).
+
+### Step 5 — Login to Azure
+
+```bash
+az login
+```
+
+### Step 6 — Choose How to Run It
+
+Pick one of the three options below:
+
+#### Option A: Shell Script — Full Deployment (new infrastructure)
 
 Creates Resource Group → Capacity → Workspace → Lakehouse → loads data.
 
 ```bash
-# 1. Clone this repo
-git clone https://github.com/DataSnowman/skills-for-fabric-load-medicare-data.git
-cd skills-for-fabric-load-medicare-data
-
-# 2. (Optional) Set up Python environment with uv
-uv venv && source .venv/bin/activate
-
-# 3. Edit config/variables.md with your values (see Configuration above)
-vi config/variables.md
-# Or open the whole repo in VS Code
-code .
-
-# 4. Drop your Medicare Part D zip file(s) into data/DemoZippedFiles/
-#    (1 to 11 zip files — the script auto-detects all years present)
-#    No need to edit the script — it reads config/variables.md automatically
-
-# 5. Login to Azure
-az login
-
-# 6. Run it
 chmod +x deploy-medicare-e2e.sh
+```
+
+```bash
 ./deploy-medicare-e2e.sh
 ```
 
-### Option B: Existing Workspace (Contributor access)
+#### Option B: Shell Script — Existing Workspace (Contributor access)
 
-Use this if you already have a Resource Group, Fabric Capacity, and Workspace. Only needs your **Workspace ID**.
+Uses your existing workspace. Only needs `WS_ID` set in `config/variables.md`.
 
 ```bash
-# 1. Clone this repo
-git clone https://github.com/DataSnowman/skills-for-fabric-load-medicare-data.git
-cd skills-for-fabric-load-medicare-data
-
-# 2. Edit config/variables.md — set WS_ID and local file paths
-vi config/variables.md
-# Or open the whole repo in VS Code
-code .
-
-# 3. Drop your Medicare Part D zip file(s) into data/DemoZippedFiles/
-#    (1 to 11 zip files — the script auto-detects all years present)
-#    No need to edit the script — it reads config/variables.md automatically
-
-# 4. Login to Azure
-az login
-
-# 5. Run it
 chmod +x deploy-medicare-to-workspace.sh
+```
+
+```bash
 ./deploy-medicare-to-workspace.sh
 ```
 
-> To find your Workspace ID: open the workspace in the Fabric portal — the ID is in the URL: `https://app.fabric.microsoft.com/groups/<WORKSPACE_ID>/...`
+#### Option C: AI Coding Agent (GitHub Copilot CLI or Claude Code)
 
-### What each script does
+Let an AI agent read the context files and execute each step interactively in the terminal.
+
+**GitHub Copilot CLI:**
+```bash
+copilot
+```
+
+OR
+
+**Claude Code:**
+```bash
+claude
+```
+
+Once the agent is running, give it a prompt that references the context and config files. For example:
+
+**Full deployment (new infrastructure + data load):**
+```
+Read config/variables.md for the configuration values, then follow
+context/buildfabricworkspace.md to create the Fabric infrastructure
+and context/LoadMedicareData.md to upload and load the Medicare data.
+```
+
+**Existing workspace (data load only):**
+```
+Read config/variables.md for the workspace ID and paths, then follow
+context/LoadMedicareData.md to upload the zip files, deploy the
+notebooks, and load the data into the Lakehouse.
+```
+
+**Just a specific step (e.g., notebook binding troubleshooting):**
+```
+Read context/updateDefinitionNotebookEndpoint.md — I need help
+attaching a Lakehouse to a notebook via the updateDefinition API.
+```
+
+**Just a specific zipfile (e.g., Just load 2022 zipfile):**
+```
+Read context/LoadMedicareData.md — Just load the 2022 zipfile
+and make the appropriate change to the LoadMedicarePartDfiles.ipynb.
+```
+
+> **Tip:** You don't need to copy-paste commands yourself — the agent reads the context files, fills in your variables, and executes each step in the terminal. If something fails, it will troubleshoot and retry automatically.
+
+### What each script does (Options A & B)
 
 | Step | Full (`deploy-medicare-e2e.sh`) | Existing (`deploy-medicare-to-workspace.sh`) |
 |---|---|---|
@@ -152,6 +209,14 @@ chmod +x deploy-medicare-to-workspace.sh
 | Verify Delta table | ✅ | ✅ (Step 6) |
 
 > **⚠️ Cost Warning:** This creates a billable Fabric capacity. Pause or delete the capacity when not in use.
+
+### Troubleshooting with skills-for-fabric
+
+The [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric) repo contains the Fabric-specific skills and MCP server setup that were used to create the context files in this repo. If you need to troubleshoot or extend the deployment:
+
+1. Clone `skills-for-fabric` alongside this repo
+2. Use its skills (e.g., `spark-authoring-cli`, `fabric-workspace-cli`) for deeper Fabric API guidance
+3. See its `mcp-setup/` folder for MCP server configuration
 
 ---
 
@@ -175,42 +240,70 @@ chmod +x deploy-medicare-to-workspace.sh
     └── TestEnvNotebook.ipynb              # Environment test notebook
 ```
 
+
+## Checking if things worked
+
+When the script completes successfully you might get something that 
+looks like this in the terminal.
+
+All steps succeeded:
+
+| Resource  | Name                                    | ID         |
+ |-----------|----------------------------------------|------------|
+ | Capacity  | westus3f4skillsfghcpcliubunto           | 8110829b-  |
+ | Workspace | MedicareSkillsF4ghcpcliubuntu           | b8eee3e8-  |
+ | Lakehouse | MedicareSkillsF4TerminalLHghcpcliubuntu | f56e57b3-  |
+ | Table     | mcpd.medicarepartd                      | ✅ verified |
+
 ---
 
-## Using with AI Coding Agents
+Here are some images of the Fabric screen shots
 
-The files in `config/` and `context/` are designed to be read by AI coding agents. They provide the step-by-step knowledge an agent needs to provision Fabric infrastructure and load data.
 
-### Claude Code
+Fabric Capacity
 
-```bash
-# Clone both repos
-git clone https://github.com/microsoft/skills-for-fabric.git
-git clone https://github.com/DataSnowman/skills-for-fabric-load-medicare-data.git
 
-# Open this repo in Claude Code — it will read the context/ files automatically
-cd skills-for-fabric-load-medicare-data
-claude
+![capacity](https://raw.githubusercontent.com/datasnowman/
+SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/capacity.png)
+
+
+Fabric Workspace
+
+
+![workspace](https://raw.githubusercontent.com/datasnowman/
+SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/workspace.png)
+
+
+Fabric Lakehouse Files and Tables
+
+
+![lakehouse](https://raw.githubusercontent.com/datasnowman/
+SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/lakehouse.png)
+
+
+Fabric Notebooks
+
+
+![nbunzip](https://raw.githubusercontent.com/datasnowman/
+SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbunzip.png)
+
+
+![nbload](https://raw.githubusercontent.com/datasnowman/
+SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbload.png)
+
+
+Fabric SQL Analytics Endpoint
+
+
+![sqlep](https://raw.githubusercontent.com/datasnowman/
+SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/sqlep.png)
+
+To verify the row count in Fabric SQL:
 ```
-
-### GitHub Copilot CLI
-
-```bash
-# Open in VS Code with Copilot enabled
-cd skills-for-fabric-load-medicare-data
-copilot
-
-# Reference context files in your prompts, e.g.:
-# "Use variables.md to run buildfabricworkspace.md and then LoadMedicareData.md"
-```
-
-### Troubleshooting with skills-for-fabric
-
-The [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric) repo contains the Fabric-specific skills and MCP server setup that were used to create the context files in this repo. If you need to troubleshoot or extend the deployment:
-
-1. Clone `skills-for-fabric` alongside this repo
-2. Use its skills (e.g., `spark-authoring-cli`, `fabric-workspace-cli`) for deeper Fabric API guidance
-3. See its `mcp-setup/` folder for MCP server configuration
+ SELECT [year], count(*) as numberofrows
+ FROM [<NameOfLakehouse>].[mcpd].[medicarepartd]
+ GROUP BY [year]
+``` 
 
 ---
 
@@ -501,51 +594,32 @@ GROUP BY [year]
 
 ---
 
-## Checking if things worked
-
-When the script completes successfully you might get something that looks like this in the terminal.
-
-All steps succeeded:
 
 
-| Resource  | Name                                    | ID         |
- |-----------|----------------------------------------|------------|
- | Capacity  | westus3f4skillsfghcpcliubunto           | 8110829b-  |
- | Workspace | MedicareSkillsF4ghcpcliubuntu           | b8eee3e8-  |
- | Lakehouse | MedicareSkillsF4TerminalLHghcpcliubuntu | f56e57b3-  |
- | Table     | mcpd.medicarepartd                      | ✅ verified |
 
----
 
-To verify the row count in Fabric SQL:
-```
- SELECT [year], count(*) as numberofrows
- FROM [<NameOfLakehouse>].[mcpd].[medicarepartd]
- GROUP BY [year]
-``` 
-Here are some images of the Fabric screen shots
 
-Fabric Capacity
 
-![capacity](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/capacity.png)
 
-Fabric Workspace
 
-![workspace](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/workspace.png)
 
-Fabric Lakehouse Files and Tables
 
-![lakehouse](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/lakehouse.png)
 
-Fabric Notebooks
 
-![nbunzip](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbunzip.png)
 
-![nbload](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/nbload.png)
 
-Fabric SQL Analytics Endpoint
 
-![sqlep](https://raw.githubusercontent.com/datasnowman/SKILLS-FOR-FABRIC-LOAD-MEDICARE-DATA/main/images/sqlep.png)
+
+
+
+
+
+
+
+
+
+
+
 
 
 ## Notes
