@@ -19,8 +19,9 @@ The key enabler is **AI in the terminal**: tools like [GitHub Copilot CLI](https
 - **GitHub Copilot CLI** [Installing GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli) or **Claude Code** [Getting Started Quickstart](https://code.claude.com/docs/en/quickstart)
 - **Azure CLI** installed (`az --version`)
 - **Logged in** to Azure (`az login`)
-- **Python 3.9+** available (`python3 --version`)
-- **Bash shell** — macOS Terminal, Linux shell, or Windows WSL/Git Bash
+- **A supported shell** — one of:
+  - **Bash** (for the `*.sh` scripts) — macOS Terminal, Linux, or Windows WSL/Git Bash. Requires **Python 3.9+** (`python3 --version`).
+  - **PowerShell 7+** (for the `*.ps1` scripts) — native on **Windows** (also runs on macOS/Linux). Uses `curl.exe` (bundled with Windows 10+) and needs **no Python**.
 - **Microsoft Fabric** — one of the following:
   - **Full deployment:** An Azure subscription with permissions to create Resource Groups and [Fabric capacities](https://learn.microsoft.com/en-us/fabric/enterprise/licenses) (F4 or higher — F2 does not have sufficient Spark resources for these notebooks)
   - **Existing workspace:** Contributor (or higher) access to an existing Fabric workspace on an F4+ capacity
@@ -28,7 +29,24 @@ The key enabler is **AI in the terminal**: tools like [GitHub Copilot CLI](https
   - 11 Medicare Part D zip files in a local directory — [Download data](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data) | [Data dictionary](https://data.cms.gov/resources/medicare-part-d-prescribers-by-provider-and-drug-data-dictionary)
   - `UnzipMedicareFiles.ipynb` and `LoadMedicarePartDfiles.ipynb` notebooks (included in `notebooks/`)
 
-> **Windows users:** Run the script in [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) or Git Bash. Native PowerShell is not supported.
+> **Windows users:** You have two options. Run the native **PowerShell** scripts
+> (`deploy-medicare-e2e.ps1` / `deploy-medicare-to-workspace.ps1`) directly in PowerShell 7+
+> — no WSL required — **or** run the **bash** scripts (`*.sh`) under [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
+> or Git Bash. Both paths read the same `config/variables.md`.
+
+## Cross-Platform Support
+
+This repo is fully multi-OS. Every deployment path ships in **both** bash and PowerShell:
+
+| Path | Bash (macOS / Linux / WSL / Git Bash) | PowerShell 7+ (Windows / macOS / Linux) |
+|---|---|---|
+| Full deployment | `deploy-medicare-e2e.sh` | `deploy-medicare-e2e.ps1` |
+| Existing workspace | `deploy-medicare-to-workspace.sh` | `deploy-medicare-to-workspace.ps1` |
+
+Both families read configuration from the same [`config/variables.md`](config/variables.md),
+auto-detect whichever zip years are present in `data/DemoZippedFiles/`, and produce identical
+results. The PowerShell scripts are self-contained (no Python required) and share helpers from
+`medicare-common.ps1`.
 
 ---
 
@@ -121,30 +139,36 @@ az login
 
 ### Step 6 — Choose How to Run It
 
-Pick one of the three options below:
+Pick one of the options below. **Bash** and **PowerShell** versions are equivalent — use whichever fits your OS.
 
-#### Option A: Shell Script — Full Deployment (new infrastructure)
+#### Option A: Full Deployment (new infrastructure)
 
 Creates Resource Group → Capacity → Workspace → Lakehouse → loads data.
 
+**Bash (macOS / Linux / WSL / Git Bash):**
 ```bash
 chmod +x deploy-medicare-e2e.sh
-```
-
-```bash
 ./deploy-medicare-e2e.sh
 ```
 
-#### Option B: Shell Script — Existing Workspace (Contributor access)
+**PowerShell 7+ (Windows / macOS / Linux):**
+```powershell
+pwsh ./deploy-medicare-e2e.ps1
+```
+
+#### Option B: Existing Workspace (Contributor access)
 
 Uses your existing workspace. Only needs `WS_ID` set in `config/variables.md`.
 
+**Bash (macOS / Linux / WSL / Git Bash):**
 ```bash
 chmod +x deploy-medicare-to-workspace.sh
+./deploy-medicare-to-workspace.sh
 ```
 
-```bash
-./deploy-medicare-to-workspace.sh
+**PowerShell 7+ (Windows / macOS / Linux):**
+```powershell
+pwsh ./deploy-medicare-to-workspace.ps1
 ```
 
 #### Option C: AI Coding Agent (GitHub Copilot CLI or Claude Code)
@@ -195,7 +219,9 @@ and make the appropriate change to the LoadMedicarePartDfiles.ipynb.
 
 ### What each script does (Options A & B)
 
-| Step | Full (`deploy-medicare-e2e.sh`) | Existing (`deploy-medicare-to-workspace.sh`) |
+Bash and PowerShell versions perform the same steps.
+
+| Step | Full (`deploy-medicare-e2e.sh` / `.ps1`) | Existing (`deploy-medicare-to-workspace.sh` / `.ps1`) |
 |---|---|---|
 | Preflight checks | ✅ | ✅ |
 | Create Resource Group | ✅ | — |
@@ -224,9 +250,12 @@ The [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric
 
 ```
 ├── README.md                              # This file
-├── deploy-medicare-e2e.sh                 # Full deployment (creates all infrastructure)
-├── deploy-medicare-to-workspace.sh        # Existing workspace (Contributor access)
-├── pyproject.toml                         # Python project config (for uv)
+├── deploy-medicare-e2e.sh                 # Full deployment — bash (creates all infrastructure)
+├── deploy-medicare-e2e.ps1                # Full deployment — PowerShell (Windows-native)
+├── deploy-medicare-to-workspace.sh        # Existing workspace — bash (Contributor access)
+├── deploy-medicare-to-workspace.ps1       # Existing workspace — PowerShell (Windows-native)
+├── medicare-common.ps1                    # Shared helpers for the PowerShell scripts
+├── pyproject.toml                         # Python project config (for uv; bash scripts only)
 ├── .gitignore
 ├── config/
 │   └── variables.md                       # All configurable names, IDs, and paths

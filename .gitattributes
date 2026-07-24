@@ -1,0 +1,10 @@
+# Ensure bash scripts always use LF so they run correctly under WSL / Git Bash / macOS / Linux,
+# even when cloned on Windows with core.autocrlf=true.
+*.sh   text eol=lf
+
+# PowerShell and notebooks: normalize to LF in the repo; Git/PowerShell handle either EOL fine.
+*.ps1  text eol=lf
+*.ipynb text eol=lf
+
+# Markdown / config: normalized text.
+*.md   text

@@ -2,11 +2,18 @@
 
 > **Shared Variables**: Load all IDs, names, and paths before running any commands.
 > ```bash
-> # Load shared variables
+> # Load shared variables (bash)
 > source config/variables.md   # or copy-paste the values from config/variables.md into your terminal
 > ```
 
-End-to-end workflow to upload a zipped Medicare Part D dataset from your desktop to the `TerminlLH` Lakehouse, unzip it via a Fabric Pipeline, and load the CSVs into a Delta table using a Spark Notebook.
+> **Cross-platform note:** The step-by-step commands below are written for **bash** (macOS /
+> Linux / WSL / Git Bash). If you're on **Windows and prefer native PowerShell**, run the
+> ready-made scripts instead — `deploy-medicare-e2e.ps1` (full) or
+> `deploy-medicare-to-workspace.ps1` (existing workspace) — which perform every step here.
+> All paths below are **repo-relative** so they work on any OS; adjust only if your zips or
+> notebooks live elsewhere.
+
+End-to-end workflow to upload a zipped Medicare Part D dataset from the repo to the `TerminlLH` Lakehouse, unzip it via a Fabric Pipeline, and load the CSVs into a Delta table using a Spark Notebook.
 
 ---
 
@@ -24,19 +31,21 @@ End-to-end workflow to upload a zipped Medicare Part D dataset from your desktop
 ```bash
 WS_ID="3c8b0517-a8ef-4c81-ad69-91d7860e36df"
 LH_ID="68ad9840-d518-4b4a-9efd-7fc4585f162b"
-ZIP_FILE="<your-zip-filename>.zip"            # e.g. MedicarePartD.zip — file on ~/Desktop/
-NOTEBOOK_LOCAL_PATH="/Users/darwinschweitzer/sourceData/MedicarePartD/code/notebook/LoadMedicarePartDfiles.ipynb"
+ZIP_FILE="<your-zip-filename>.zip"            # e.g. Medicare_Part_D_Prescribers_by_Provider_and_Drug_2024.zip
+ZIP_SOURCE_DIR="data/DemoZippedFiles"         # repo-relative; the demo set ships 2022–2024
+NOTEBOOK_LOCAL_PATH="notebooks/LoadMedicarePartDfiles.ipynb"   # repo-relative
 NOTEBOOK_NAME="LoadMedicarePartDfiles"
 ```
 
 ---
 
-## Step 1 — Upload Zip File from Desktop to TerminlLH Files
+## Step 1 — Upload Zip File to TerminlLH Files
 
 Uses the OneLake DFS API. Requires a `storage.azure.com` token (different from the Fabric API token).
 
 ```bash
 ZIP_FILE="<your-zip-filename>.zip"
+ZIP_SOURCE_DIR="data/DemoZippedFiles"
 WS_ID="3c8b0517-a8ef-4c81-ad69-91d7860e36df"
 LH_ID="68ad9840-d518-4b4a-9efd-7fc4585f162b"
 
@@ -50,7 +59,7 @@ curl -s -X PUT \
   -H "Authorization: Bearer $STORAGE_TOKEN" \
   -H "x-ms-version: 2023-01-03" \
   -H "x-ms-blob-type: BlockBlob" \
-  --data-binary @"$HOME/Desktop/$ZIP_FILE" \
+  --data-binary @"$ZIP_SOURCE_DIR/$ZIP_FILE" \
   "https://onelake.dfs.fabric.microsoft.com/$WS_ID/$LH_ID/Files/medicare/$ZIP_FILE"
 
 echo "Upload complete: Files/medicare/$ZIP_FILE"
@@ -203,11 +212,14 @@ Reads the local `.ipynb` file, encodes it, and deploys it to the `skills-for-fab
 ```bash
 WS_ID="3c8b0517-a8ef-4c81-ad69-91d7860e36df"
 LH_ID="68ad9840-d518-4b4a-9efd-7fc4585f162b"
-NOTEBOOK_LOCAL_PATH="/Users/darwinschweitzer/sourceData/MedicarePartD/code/notebook/LoadMedicarePartDfiles.ipynb"
+NOTEBOOK_LOCAL_PATH="notebooks/LoadMedicarePartDfiles.ipynb"   # repo-relative
 NOTEBOOK_NAME="LoadMedicarePartDfiles"
 
 # Encode notebook as base64
-NB_B64=$(base64 -i "$NOTEBOOK_LOCAL_PATH")
+# macOS:        base64 -i "$NOTEBOOK_LOCAL_PATH"
+# Linux/WSL:    base64 -w0 "$NOTEBOOK_LOCAL_PATH"
+# PowerShell:   [Convert]::ToBase64String([IO.File]::ReadAllBytes($NOTEBOOK_LOCAL_PATH))
+NB_B64=$(base64 -i "$NOTEBOOK_LOCAL_PATH" 2>/dev/null || base64 -w0 "$NOTEBOOK_LOCAL_PATH")
 
 # Build request body with default lakehouse binding
 cat > /tmp/notebook_body.json << EOF
