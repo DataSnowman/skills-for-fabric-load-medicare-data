@@ -25,8 +25,9 @@ The key enabler is **AI in the terminal**: tools like [GitHub Copilot CLI](https
 - **Microsoft Fabric** — one of the following:
   - **Full deployment:** An Azure subscription with permissions to create Resource Groups and [Fabric capacities](https://learn.microsoft.com/en-us/fabric/enterprise/licenses) (F4 or higher — F2 does not have sufficient Spark resources for these notebooks)
   - **Existing workspace:** Contributor (or higher) access to an existing Fabric workspace on an F4+ capacity
-- **Local data files**:
-  - 11 Medicare Part D zip files in a local directory — [Download data](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data) | [Data dictionary](https://data.cms.gov/resources/medicare-part-d-prescribers-by-provider-and-drug-data-dictionary)
+- **Medicare Part D data files** — 1 to 11 zip files (the scripts auto-detect whichever years are present):
+  - [Download data](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data) | [Data dictionary](https://data.cms.gov/resources/medicare-part-d-prescribers-by-provider-and-drug-data-dictionary)
+  - The zips are **not** in the repo (they're gitignored). See [Getting the Data](#getting-the-data) for how to fetch them — whether you're running locally or in a Codespace.
   - `UnzipMedicareFiles.ipynb` and `LoadMedicarePartDfiles.ipynb` notebooks (included in `notebooks/`)
 
 > **Windows users:** You have two options. Run the native **PowerShell** scripts
@@ -95,6 +96,11 @@ NOTEBOOK_LOCAL_PATH="/path/to/your/notebooks"
 
 ## Quick Start
 
+> 🚀 **Zero-setup option:** This repo includes a [Dev Container](.devcontainer/README.md).
+> Open it in **GitHub Codespaces** (**Code → Codespaces → Create codespace on main**) to get
+> Azure CLI, PowerShell, GitHub CLI, Copilot CLI, and Python/Jupyter pre-installed — no local
+> setup required. See the [Dev Container Quick Start](.devcontainer/README.md) for details.
+
 ### Step 1 — Clone the Repo
 
 ```bash
@@ -129,7 +135,45 @@ Open `config/variables.md` and set the values that match your environment:
 > **Existing workspace?** Just set `WS_ID` to your workspace GUID and skip the capacity/resource group fields.
 > To find your Workspace ID: open the workspace in the Fabric portal — the ID is in the URL: `https://app.fabric.microsoft.com/groups/<WORKSPACE_ID>/...`
 
-Also drop your Medicare Part D zip file(s) into `data/DemoZippedFiles/` (1 to 11 zip files — the scripts auto-detect all years present).
+You also need the Medicare Part D zip file(s) in `data/DemoZippedFiles/`. How you get them there depends on where you're running — see [Getting the Data](#getting-the-data) just below.
+
+### Getting the Data
+
+The zip files are large and **gitignored**, so they are never committed to the repo. That means a
+fresh clone (local) or a fresh Codespace starts with an empty `data/DemoZippedFiles/` folder — you
+fetch the zips yourself.
+
+> **⚠️ Filename matters.** The scripts auto-detect years by looking for files named
+> **`Medicare_Part_D_Prescribers_by_Provider_and_Drug_YYYY.zip`** (e.g. `..._2023.zip`). The CMS
+> per-year **Download** button already produces this name. If a file lands with a different name,
+> rename it to match or it will be skipped.
+
+**How to grab a year's download link (both audiences):** open the
+[CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data),
+pick a year, then **right-click the Download button → Copy link address**.
+
+#### Local VS Code (on your machine)
+
+Use the browser **Download** button for each year you want, then move the `.zip` files into the
+repo's `data/DemoZippedFiles/` folder. (You can also `curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" "<copied-URL>"` if you prefer the terminal.)
+Because the folder is a normal local path, this is the same directory the scripts read.
+
+#### GitHub Codespaces / Dev Container
+
+There's no local browser inside the container, so download **directly into the Codespace** with the
+copied CMS link — this keeps the transfer cloud-to-cloud (CMS → Codespace) instead of routing
+through your home connection:
+
+```bash
+curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" \
+  "<paste-the-CMS-download-URL-here>"
+```
+
+Repeat for each year, then verify with `ls -lh data/DemoZippedFiles/*.zip`. Full options (including
+uploading zips you already have, or letting an AI agent do the download) are in the
+[Dev Container Quick Start](.devcontainer/README.md#-getting-the-medicare-data-into-the-codespace).
+
+> **Tip:** For a quick demo, just grab one or two years (e.g. 2023 and 2022). A full 11-file set is ~8 GB.
 
 ### Step 5 — Login to Azure
 
