@@ -88,10 +88,59 @@ LAKEHOUSE_NAME="MedicarePartD"
 
 ## Quick Start
 
-> 🚀 **Zero-setup option:** This repo includes a [Dev Container](.devcontainer/README.md).
-> Open it in **GitHub Codespaces** (**Code → Codespaces → Create codespace on main**) to get
-> Azure CLI, PowerShell, GitHub CLI, Copilot CLI, and Python/Jupyter pre-installed — no local
-> setup required. See the [Dev Container Quick Start](.devcontainer/README.md) for details.
+There are **two ways** to run this, and both finish with the same deploy scripts:
+
+- **Option 1 — GitHub Codespaces** — nothing to install; everything runs in a ready-made cloud Linux environment. **Best if you've never set this up before.**
+- **Option 2 — Run Locally** — on your own macOS / Windows / Linux machine.
+
+---
+
+## Option 1 — GitHub Codespaces (zero install) 🚀
+
+A **Codespace** is a full dev environment (Linux + all the tools) that GitHub runs for you in the cloud and opens in your browser (or in VS Code). This repo ships a [Dev Container](.devcontainer/README.md), so a Codespace comes with Azure CLI, PowerShell, GitHub CLI, Copilot CLI, and Python/Jupyter **already installed** — you don't install anything on your laptop.
+
+### 1. Create the Codespace
+
+On the repo's GitHub page, click the green **Code** button → **Codespaces** tab → **Create codespace on main** (the button in your screenshot). GitHub builds the environment and opens VS Code in your browser. **First build takes a few minutes** — you'll see tools installing in the terminal, then a ✅ ready banner.
+
+> 💡 You get a free monthly Codespaces quota on personal accounts. Stop the Codespace when done (**Code → Codespaces → ⋯ → Stop**) so you don't burn hours.
+
+### 2. Sign in to Azure
+
+In the Codespace terminal, use the **device-code** flow (there's no local browser in the cloud):
+
+```bash
+az login --use-device-code
+```
+
+Open the URL it prints, enter the one-time code, and sign in with the account that can see your Fabric workspace. If you have more than one subscription:
+
+```bash
+az account set --subscription "<your-subscription-id>"
+```
+
+### 3. Set your Workspace ID
+
+The Codespace **auto-creates `config/variables.env`** for you from the template on first start. Open it (in the file explorer, `config/variables.env`) and set **`WS_ID`** to your Fabric workspace GUID — it's in the workspace URL: `https://app.fabric.microsoft.com/groups/<WS_ID>/...`.
+
+### 4. Get the Medicare zip file(s) into the Codespace
+
+The zips aren't in the repo (they're gitignored), so a fresh Codespace starts empty. Fetch them **directly into the cloud** — see [Getting the Data](#getting-the-data) below (the "GitHub Codespaces / Dev Container" method downloads straight from CMS into `data/DemoZippedFiles/`). For a quick demo, one or two years is enough.
+
+### 5. Deploy
+
+```bash
+./deploy-medicare-to-workspace.sh        # existing workspace (you set WS_ID)
+```
+> Full deployment that also creates the Resource Group, Capacity, and Workspace? Fill the admin section of `config/variables.env`, then run `./deploy-medicare-e2e.sh`. See [Step 6](#step-6--choose-how-to-run-it) for all run options (including letting an AI agent drive it).
+
+That's the whole flow — no local setup. For a deeper, screenshot-guided version see the [Dev Container Quick Start](.devcontainer/README.md).
+
+---
+
+## Option 2 — Run Locally
+
+Prefer your own machine? Install the [prerequisites](#prerequisites) first, then follow the steps below. (The steps also work in a local [Dev Container](.devcontainer/README.md) if you have Docker or `wslc`.)
 
 ### Step 1 — Clone the Repo
 
