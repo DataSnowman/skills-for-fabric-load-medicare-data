@@ -39,13 +39,14 @@ function Test-Prerequisites {
     }
 }
 
-# ─── variables.md parser (single source of truth, shared with the bash scripts) ─
+# ─── variables.env parser (single source of truth, shared with the bash scripts) ─
 
 function Get-MedicareVariables {
     <#
-        Parses config/variables.md and returns a hashtable of KEY -> value for every
-        line of the form  KEY="value"  (trailing "# comments" are ignored). Lines that
-        assign via $(...) command substitution are skipped, matching the bash loader.
+        Reads config/variables.env (plain KEY=value lines, like a .env file) and
+        returns a hashtable of KEY -> value. Blank lines and '#' comment lines are
+        ignored. Optional surrounding single/double quotes around the value are
+        stripped. Comments must be on their own line (no inline '# ...' after a value).
     #>
     param([Parameter(Mandatory)][string]$VarsFile)
 
@@ -54,11 +55,16 @@ function Get-MedicareVariables {
 
     foreach ($line in Get-Content -LiteralPath $VarsFile) {
         $trimmed = $line.Trim()
-        if ($trimmed.StartsWith('#')) { continue }
-        # KEY="value"  — value is captured from inside the first pair of double quotes
-        if ($trimmed -match '^([A-Z_][A-Z0-9_]*)="([^"]*)"') {
-            $vars[$Matches[1]] = $Matches[2]
+        if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
+        $idx = $trimmed.IndexOf('=')
+        if ($idx -lt 1) { continue }
+        $key = $trimmed.Substring(0, $idx).Trim()
+        $val = $trimmed.Substring($idx + 1).Trim()
+        if ($val.Length -ge 2 -and
+            (($val[0] -eq '"' -and $val[-1] -eq '"') -or ($val[0] -eq "'" -and $val[-1] -eq "'"))) {
+            $val = $val.Substring(1, $val.Length - 2)
         }
+        if ($key -match '^[A-Za-z_][A-Za-z0-9_]*$') { $vars[$key] = $val }
     }
     return $vars
 }

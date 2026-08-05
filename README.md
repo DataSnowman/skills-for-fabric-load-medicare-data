@@ -33,7 +33,7 @@ The key enabler is **AI in the terminal**: tools like [GitHub Copilot CLI](https
 > **Windows users:** You have two options. Run the native **PowerShell** scripts
 > (`deploy-medicare-e2e.ps1` / `deploy-medicare-to-workspace.ps1`) directly in PowerShell 7+
 > — no WSL required — **or** run the **bash** scripts (`*.sh`) under [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
-> or Git Bash. Both paths read the same `config/variables.md`.
+> or Git Bash. Both paths read the same `config/variables.env`.
 
 ## Cross-Platform Support
 
@@ -44,7 +44,7 @@ This repo is fully multi-OS. Every deployment path ships in **both** bash and Po
 | Full deployment | `deploy-medicare-e2e.sh` | `deploy-medicare-e2e.ps1` |
 | Existing workspace | `deploy-medicare-to-workspace.sh` | `deploy-medicare-to-workspace.ps1` |
 
-Both families read configuration from the same [`config/variables.md`](config/variables.md),
+Both families read configuration from the same [`config/variables.env`](config/variables.env),
 auto-detect whichever zip years are present in `data/DemoZippedFiles/`, and produce identical
 results. The PowerShell scripts are self-contained (no Python required) and share helpers from
 `medicare-common.ps1`.
@@ -59,38 +59,21 @@ Also mention the md files that are in the context folder because buildfabricwork
 
 ## Configuration
 
-All configuration is managed in [`config/variables.md`](config/variables.md). **Edit this file before running either script.**
+All configuration lives in [`config/variables.env`](config/variables.env) — the single file you edit, shared by both the PowerShell and bash scripts.
 
-| Variable | Full Deploy | Existing Workspace | Description |
-|---|---|---|---|
-| `RESOURCE_GROUP` | ✅ | — | Azure Resource Group name |
-| `LOCATION` | ✅ | — | Azure region (e.g., `westus3`) |
-| `SKU` | ✅ | — | Fabric capacity SKU (`F4` minimum) |
-| `CAPACITY_NAME` | ✅ | — | Globally unique, lowercase alphanumeric |
-| `WORKSPACE_NAME` | ✅ | — | Fabric workspace display name |
-| `WS_ID` | — | ✅ **Required** | Existing workspace GUID |
-| `LAKEHOUSE_NAME` | ✅ | ✅ | Lakehouse to create |
-| `ZIP_SOURCE_DIR` | ✅ | ✅ | Local path to zip files |
-| `NOTEBOOK_LOCAL_PATH` | ✅ | ✅ | Local path to `.ipynb` notebooks |
+**Most people — deploy into an existing workspace.** You only need `WS_ID`:
+
+| Variable | Required | Description |
+|---|---|---|
+| `WS_ID` | ✅ | Existing Fabric workspace GUID (from the workspace URL) |
+| `LAKEHOUSE_NAME` | optional | Lakehouse to create (defaults to `MedicarePartD`) |
 
 ```bash
-# Azure (full deploy only)
-RESOURCE_GROUP="FabricCapacityWestUS3"
-LOCATION="westus3"
-SKU="F4"
-
-# Fabric (full deploy only)
-CAPACITY_NAME="westus3f4skillsfghcpcli"
-WORKSPACE_NAME="MedicareSkillsF4ghcpcli"
-
-# Workspace ID (existing workspace only)
-WS_ID=""                                    # e.g. "dc7ad9cf-c461-4204-8b73-6c1fcb4aff18"
-
-# Both paths
-LAKEHOUSE_NAME="MedicareSkillsTerminalLH"
-ZIP_SOURCE_DIR="/path/to/your/zip/files"
-NOTEBOOK_LOCAL_PATH="/path/to/your/notebooks"
+WS_ID=""                          # REQUIRED — your existing Fabric workspace GUID
+LAKEHOUSE_NAME="MedicarePartD"
 ```
+
+**Admins only — full deployment** (`deploy-medicare-e2e.*`) also creates the Resource Group, Fabric Capacity, and Workspace. Those extra variables (`RESOURCE_GROUP`, `LOCATION`, `SKU`, `CAPACITY_NAME`, `WORKSPACE_NAME`) live in a separate section of `config/variables.env` — ignore them if you're using an existing workspace.
 
 ---
 
@@ -123,17 +106,16 @@ code .
 
 ### Step 4 — Edit Configuration
 
-Open `config/variables.md` and set the values that match your environment:
+Open `config/variables.env` and set **`WS_ID`** to your existing Fabric workspace GUID:
 
 | Variable | What to set |
 |---|---|
-| `RESOURCE_GROUP` | Your Azure Resource Group name |
-| `CAPACITY_NAME` | A globally unique, lowercase alphanumeric Fabric capacity name |
-| `WORKSPACE_NAME` | Your Fabric workspace display name |
-| `LAKEHOUSE_NAME` | The Lakehouse to create |
+| `WS_ID` | Your existing Fabric workspace GUID (**required**) |
+| `LAKEHOUSE_NAME` | The Lakehouse to create (optional — defaults to `MedicarePartD`) |
 
-> **Existing workspace?** Just set `WS_ID` to your workspace GUID and skip the capacity/resource group fields.
 > To find your Workspace ID: open the workspace in the Fabric portal — the ID is in the URL: `https://app.fabric.microsoft.com/groups/<WORKSPACE_ID>/...`
+>
+> **Doing a full deployment instead?** (creates the Resource Group, Capacity, and Workspace for you — admins only.) Set `RESOURCE_GROUP`, `LOCATION`, `SKU`, `CAPACITY_NAME`, and `WORKSPACE_NAME` in the full-deployment section of `config/variables.env`.
 
 You also need the Medicare Part D zip file(s) in `data/DemoZippedFiles/`. How you get them there depends on where you're running — see [Getting the Data](#getting-the-data) just below.
 
@@ -202,7 +184,7 @@ pwsh ./deploy-medicare-e2e.ps1
 
 #### Option B: Existing Workspace (Contributor access)
 
-Uses your existing workspace. Only needs `WS_ID` set in `config/variables.md`.
+Uses your existing workspace. Only needs `WS_ID` set in `config/variables.env`.
 
 **Bash (macOS / Linux / WSL / Git Bash):**
 ```bash
@@ -235,14 +217,14 @@ Once the agent is running, give it a prompt that references the context and conf
 
 **Full deployment (new infrastructure + data load):**
 ```
-Read config/variables.md for the configuration values, then follow
+Read config/variables.env for the configuration values, then follow
 context/buildfabricworkspace.md to create the Fabric infrastructure
 and context/LoadMedicareData.md to upload and load the Medicare data.
 ```
 
 **Existing workspace (data load only):**
 ```
-Read config/variables.md for the workspace ID and paths, then follow
+Read config/variables.env for the workspace ID and paths, then follow
 context/LoadMedicareData.md to upload the zip files, deploy the
 notebooks, and load the data into the Lakehouse.
 ```
@@ -302,7 +284,7 @@ The [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric
 ├── pyproject.toml                         # Python project config (for uv; bash scripts only)
 ├── .gitignore
 ├── config/
-│   └── variables.md                       # All configurable names, IDs, and paths
+│   └── variables.env                       # The one file you edit: WS_ID (+ optional full-deploy settings)
 ├── context/                               # AI agent context files (Claude Code / Copilot CLI)
 │   ├── buildfabricworkspace.md            # Step-by-step infrastructure provisioning
 │   ├── LoadMedicareData.md                # Step-by-step data loading workflow
@@ -388,7 +370,7 @@ Creates the Azure Resource Group if it doesn't already exist:
 az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
 ```
 
-> If you already have a Resource Group, just set `RESOURCE_GROUP` in `config/variables.md` to its name — the E2E script will skip creation.
+> If you already have a Resource Group, just set `RESOURCE_GROUP` in `config/variables.env` to its name — the E2E script will skip creation.
 
 ---
 
@@ -694,4 +676,4 @@ GROUP BY [year]
 - The notebooks use **append** mode — re-running will duplicate rows. Switch to `overwrite` or add dedup logic for reruns.
 - The `year` column is extracted from the last 4 characters of the filename before `.csv`.
 - Fabric F4 capacity is billed while active. Pause or delete the capacity when not in use.
-- Two CMS naming patterns exist for older files. See `variables.md` for details.
+- Two CMS naming patterns exist for older files. See [`context/LoadMedicareData.md`](context/LoadMedicareData.md) for details.

@@ -8,11 +8,11 @@
     uploads the local zip files to OneLake, deploys + binds both notebooks, runs the unzip and
     load notebooks, and verifies the resulting Delta table.
 
-    Values are read from config/variables.md (single source of truth, shared with the bash
+    Values are read from config/variables.env (single source of truth, shared with the bash
     scripts). Override any of them with the parameters below.
 
 .PARAMETER WsId
-    Existing Fabric workspace GUID. Required (via parameter or config/variables.md).
+    Existing Fabric workspace GUID. Required (via parameter or config/variables.env).
 
 .PARAMETER LakehouseName
     Name of the Lakehouse to create in the workspace.
@@ -38,7 +38,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 
-$VarsFile      = Join-Path $ScriptDir 'config/variables.md'
+$VarsFile      = Join-Path $ScriptDir 'config/variables.env'
 $vars          = Get-MedicareVariables -VarsFile $VarsFile
 $ZipSourceDir  = Join-Path $ScriptDir 'data/DemoZippedFiles'
 $NotebookDir   = Join-Path $ScriptDir 'notebooks'
@@ -57,7 +57,7 @@ if ([string]::IsNullOrWhiteSpace($account)) { Write-Fail "Not logged in. Run 'az
 Write-Ok "Logged in as $account"
 
 if ([string]::IsNullOrWhiteSpace($WsId)) {
-    Write-Fail "WS_ID is empty. Set it in config/variables.md or pass -WsId."
+    Write-Fail "WS_ID is empty. Set it in config/variables.env or pass -WsId."
 }
 
 $wsName = Invoke-Az @('rest','--resource',$FabricApi,'--url',"$FabricApi/v1/workspaces/$WsId",

@@ -24,29 +24,20 @@ az() { command az "$@" | tr -d '\r'; }
 # =============================================================================
 
 # ─── CONFIGURATION ───────────────────────────────────────────────────────────
-# Values are loaded from config/variables.md (bash code block).
-# You can override any value by setting it here after the source block.
+# Values are loaded from config/variables.env (plain KEY=value, shared with the
+# PowerShell scripts). You can override any value by setting it here afterward.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VARS_FILE="$SCRIPT_DIR/config/variables.md"
+VARS_FILE="$SCRIPT_DIR/config/variables.env"
 
 if [[ -f "$VARS_FILE" ]]; then
-  # Extract the bash code block from variables.md using Python (BSD sed-safe)
-  _vars=$(python3 - "$VARS_FILE" <<'PYEOF'
-import sys, re
-content = open(sys.argv[1]).read()
-blocks = re.findall(r'```bash\n(.*?)```', content, re.DOTALL)
-for block in blocks:
-    for line in block.splitlines():
-        line = line.strip()
-        if re.match(r'^[A-Z_]+=', line) and not line.startswith('#'):
-            print(line)
-PYEOF
-)
-  eval "$_vars" 2>/dev/null || true
+  set -a              # export every KEY=value we source
+  # shellcheck disable=SC1090
+  source "$VARS_FILE"
+  set +a
 fi
 
-# ── Override / set defaults for values not in variables.md ──
+# ── Defaults for values not set in variables.env ──
 RESOURCE_GROUP="${RESOURCE_GROUP:-FabricCapacityWestUS3}"
 LOCATION="${LOCATION:-westus3}"
 SKU="${SKU:-F4}"

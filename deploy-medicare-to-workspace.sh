@@ -17,22 +17,30 @@ set -euo pipefail
 #   - Local zip files and notebook .ipynb files at the paths below
 #
 # Usage:
-#   1. Edit the CONFIGURATION section below (WS_ID is required)
+#   1. Set WS_ID (and optionally LAKEHOUSE_NAME) in config/variables.env
 #   2. chmod +x deploy-medicare-to-workspace.sh
 #   3. ./deploy-medicare-to-workspace.sh
 # =============================================================================
 
 # ─── CONFIGURATION ───────────────────────────────────────────────────────────
-# Edit these values before running
+# Edit config/variables.env — the single place to set WS_ID and LAKEHOUSE_NAME,
+# shared with the PowerShell scripts. It is loaded automatically below.
 
-# *** REQUIRED: Set your existing Workspace ID ***
-WS_ID=""                                     # e.g. "dc7ad9cf-c461-4204-8b73-6c1fcb4aff18"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VARS_FILE="$SCRIPT_DIR/config/variables.env"
 
-# Lakehouse (will be created in the workspace above)
-LAKEHOUSE_NAME="MedicareSkillsTerminalLH"
+if [[ -f "$VARS_FILE" ]]; then
+  set -a              # export every KEY=value we source
+  # shellcheck disable=SC1090
+  source "$VARS_FILE"
+  set +a
+fi
+
+# Defaults (used only if not set in variables.env)
+WS_ID="${WS_ID:-}"                           # REQUIRED — your existing Fabric workspace GUID
+LAKEHOUSE_NAME="${LAKEHOUSE_NAME:-MedicarePartD}"
 
 # Local paths to zip files and notebooks
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ZIP_SOURCE_DIR="$SCRIPT_DIR/data/DemoZippedFiles"
 NOTEBOOK_DIR="$SCRIPT_DIR/notebooks"
 

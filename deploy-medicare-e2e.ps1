@@ -8,7 +8,7 @@
     deploys + binds both notebooks, runs the unzip and load notebooks, and verifies the Delta
     table. Idempotent: existing resources are detected and reused.
 
-    Values are read from config/variables.md (single source of truth, shared with the bash
+    Values are read from config/variables.env (single source of truth, shared with the bash
     scripts). Override any of them with the parameters below.
 
 .PREREQUISITES
@@ -36,9 +36,9 @@ $ErrorActionPreference = 'Stop'
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $ScriptDir 'medicare-common.ps1')
 
-# ─── CONFIGURATION (loaded from config/variables.md, override via parameters) ──
+# ─── CONFIGURATION (loaded from config/variables.env, override via parameters) ──
 
-$VarsFile     = Join-Path $ScriptDir 'config/variables.md'
+$VarsFile     = Join-Path $ScriptDir 'config/variables.env'
 $vars         = Get-MedicareVariables -VarsFile $VarsFile
 $ZipSourceDir = Join-Path $ScriptDir 'data/DemoZippedFiles'
 $NotebookDir  = Join-Path $ScriptDir 'notebooks'

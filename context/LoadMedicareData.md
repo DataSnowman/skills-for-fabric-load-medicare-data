@@ -3,7 +3,7 @@
 > **Shared Variables**: Load all IDs, names, and paths before running any commands.
 > ```bash
 > # Load shared variables (bash)
-> source config/variables.md   # or copy-paste the values from config/variables.md into your terminal
+> source config/variables.env   # or copy-paste the values from config/variables.env into your terminal
 > ```
 
 > **Cross-platform note:** The step-by-step commands below are written for **bash** (macOS /

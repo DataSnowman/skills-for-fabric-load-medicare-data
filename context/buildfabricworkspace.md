@@ -3,7 +3,7 @@
 > **Shared Variables**: Load all IDs, names, and paths before running any commands.
 > ```bash
 > # Load shared variables
-> source config/variables.md   # or copy-paste the values from config/variables.md into your terminal
+> source config/variables.env   # or copy-paste the values from config/variables.env into your terminal
 > ```
 
 Use this template to provision a new Microsoft Fabric Capacity, Workspace, and Lakehouse via Azure CLI.

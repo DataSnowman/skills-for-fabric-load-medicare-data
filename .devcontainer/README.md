@@ -175,7 +175,7 @@ Each command should print a version number. If they all do, your environment is 
 ## 🏁 You're Ready — Run the Deployment
 
 With Azure sign-in complete and your zip files in `data/DemoZippedFiles/`, edit
-[`config/variables.md`](../config/variables.md) with your names/IDs, then launch a
+[`config/variables.env`](../config/variables.env) with your names/IDs, then launch a
 deployment path:
 
 **Full deployment (new infrastructure):**
@@ -183,7 +183,7 @@ deployment path:
 ./deploy-medicare-e2e.sh
 ```
 
-**Existing workspace (Contributor access, set `WS_ID` in variables.md):**
+**Existing workspace (Contributor access, set `WS_ID` in variables.env):**
 ```bash
 ./deploy-medicare-to-workspace.sh
 ```
@@ -191,7 +191,7 @@ deployment path:
 **Or let an AI agent drive it:**
 ```bash
 copilot   # or: claude
-# then: Read config/variables.md and follow context/buildfabricworkspace.md and context/LoadMedicareData.md
+# then: Read config/variables.env and follow context/buildfabricworkspace.md and context/LoadMedicareData.md
 ```
 
 > The PowerShell equivalents (`pwsh ./deploy-medicare-e2e.ps1`) also work inside the

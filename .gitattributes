@@ -8,3 +8,7 @@
 
 # Markdown / config: normalized text.
 *.md   text
+
+# The .env config is sourced directly by the bash scripts, so it must be LF
+# (CRLF would inject a trailing $'\r' into every value / break `source`).
+*.env  text eol=lf
