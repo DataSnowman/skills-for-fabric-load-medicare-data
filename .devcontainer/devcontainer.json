@@ -18,5 +18,5 @@
     }
   },
   "onCreateCommand": "pip install --upgrade pip && pip install jupyter pandas && npm install -g @github/copilot @anthropic-ai/claude-code",
-  "postStartCommand": "echo '✅ Tools ready (Azure CLI, PowerShell, GitHub CLI, Copilot CLI, Claude Code, Python/Jupyter). BEFORE deploying: 1) az login --use-device-code  2) fill in values in config/variables.env  3) add Medicare Part D zip files to data/DemoZippedFiles/ (see the README there). THEN run ./deploy-medicare-e2e.sh'"
+  "postStartCommand": "cp -n config/variables.env.example config/variables.env 2>/dev/null; echo '✅ Tools ready (Azure CLI, PowerShell, GitHub CLI, Copilot CLI, Claude Code, Python/Jupyter). BEFORE deploying: 1) az login --use-device-code  2) fill in values in config/variables.env (copied from config/variables.env.example)  3) add Medicare Part D zip files to data/DemoZippedFiles/ (see the README there). THEN run ./deploy-medicare-e2e.sh'"
 }

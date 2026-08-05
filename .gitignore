@@ -19,3 +19,7 @@ __pycache__/
 # Azure/Fabric tokens
 *.token
 .env
+
+# Local deploy config with real values (copy from config/variables.env.example).
+# The .example template IS committed; the filled-in file is not.
+config/variables.env

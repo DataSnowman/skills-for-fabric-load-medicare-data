@@ -42,8 +42,10 @@ sudo npm install -g @github/copilot @anthropic-ai/claude-code
 
 echo ""
 echo "✅ Azure Linux 4.0 environment ready (Azure CLI, PowerShell, Copilot CLI, Claude Code, Python/Jupyter, Node)."
+cp -n config/variables.env.example config/variables.env 2>/dev/null && \
+    echo "→ Created config/variables.env from the template."
 echo "BEFORE deploying:"
 echo "  1) az login --use-device-code"
-echo "  2) fill in values in config/variables.env"
+echo "  2) fill in values in config/variables.env (copied from config/variables.env.example)"
 echo "  3) add Medicare Part D zip files to data/DemoZippedFiles/ (see the README there)"
 echo "THEN run ./deploy-medicare-e2e.sh"

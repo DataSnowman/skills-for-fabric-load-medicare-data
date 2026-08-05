@@ -59,7 +59,16 @@ Also mention the md files that are in the context folder because buildfabricwork
 
 ## Configuration
 
-All configuration lives in [`config/variables.env`](config/variables.env) — the single file you edit, shared by both the PowerShell and bash scripts.
+Configuration lives in `config/variables.env` — the single file you edit, shared by both the PowerShell and bash scripts. This file is **gitignored** (so your workspace IDs stay local); create it once by copying the tracked template:
+
+```bash
+cp config/variables.env.example config/variables.env          # bash / WSL / macOS
+```
+```powershell
+Copy-Item config/variables.env.example config/variables.env   # PowerShell
+```
+
+Then edit `config/variables.env` with your values. See [`config/variables.env.example`](config/variables.env.example) for the full list.
 
 **Most people — deploy into an existing workspace.** You only need `WS_ID`:
 
@@ -105,6 +114,15 @@ code .
 ```
 
 ### Step 4 — Edit Configuration
+
+Create your config from the template (it's gitignored, so it isn't in a fresh clone), then set **`WS_ID`**:
+
+```bash
+cp config/variables.env.example config/variables.env          # bash / WSL / macOS
+```
+```powershell
+Copy-Item config/variables.env.example config/variables.env   # PowerShell
+```
 
 Open `config/variables.env` and set **`WS_ID`** to your existing Fabric workspace GUID:
 
@@ -284,7 +302,8 @@ The [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric
 ├── pyproject.toml                         # Python project config (for uv; bash scripts only)
 ├── .gitignore
 ├── config/
-│   └── variables.env                       # The one file you edit: WS_ID (+ optional full-deploy settings)
+│   ├── variables.env.example               # Template — copy to variables.env and fill in
+│   └── variables.env                       # Your local config (gitignored): WS_ID (+ optional full-deploy settings)
 ├── context/                               # AI agent context files (Claude Code / Copilot CLI)
 │   ├── buildfabricworkspace.md            # Step-by-step infrastructure provisioning
 │   ├── LoadMedicareData.md                # Step-by-step data loading workflow

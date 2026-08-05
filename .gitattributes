@@ -12,3 +12,6 @@
 # The .env config is sourced directly by the bash scripts, so it must be LF
 # (CRLF would inject a trailing $'\r' into every value / break `source`).
 *.env  text eol=lf
+# The template is copied to variables.env and sourced too — keep it LF as well
+# (the *.env rule above does not match the .example suffix).
+*.env.example  text eol=lf

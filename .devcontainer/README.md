@@ -174,8 +174,9 @@ Each command should print a version number. If they all do, your environment is 
 
 ## 🏁 You're Ready — Run the Deployment
 
-With Azure sign-in complete and your zip files in `data/DemoZippedFiles/`, edit
-[`config/variables.env`](../config/variables.env) with your names/IDs, then launch a
+With Azure sign-in complete and your zip files in `data/DemoZippedFiles/`, create your config
+from the template (`cp config/variables.env.example config/variables.env`) and edit
+`config/variables.env` with your names/IDs, then launch a
 deployment path:
 
 **Full deployment (new infrastructure):**
