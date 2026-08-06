@@ -50,8 +50,23 @@ Keeps the transfer cloud-to-cloud (CMS → Codespace), so it doesn't go through 
 > saves the ~3 KB HTML web page (if a "zip" is ~3 KB, that's what happened). Instead download the
 > underlying **CSV** (a static, curl-able file) and zip it with the correct inner name.
 
-1. In the Codespace terminal, download each year's CSV and repackage it. The CSV URLs below are
-   verified working (each is 3.7–4.1 GB):
+1. Run the fetch helper from the repo root — it downloads each year's CSV and repackages it into a
+   correctly-named zip in `data/DemoZippedFiles/`, deleting each CSV afterward to save disk:
+
+   ```bash
+   ./fetch-medicare-data.sh 2024 2023    # one or two years is plenty for a demo
+   # ./fetch-medicare-data.sh            # default: 2024 2023 2022
+   ```
+
+   Each CSV is ~4 GB and zipping takes a few minutes per year; deleting each CSV after zipping keeps
+   peak disk under ~5 GB (fits a default 32 GB Codespace).
+
+   > **If a CSV URL 404s** (CMS republishes periodically), open the
+   > [CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug),
+   > open **DevTools → Network**, click that year's **Download**, and copy the request URL ending in
+   > `.csv` (a `data.cms.gov/sites/default/files/…` path). Update the URL in `fetch-medicare-data.sh`.
+
+   <details><summary>Prefer to run it by hand instead of the helper?</summary>
 
    ```bash
    cd data/DemoZippedFiles
@@ -66,19 +81,12 @@ Keeps the transfer cloud-to-cloud (CMS → Codespace), so it doesn't go through 
      BASE="Medicare_Part_D_Prescribers_by_Provider_and_Drug_${Y}"
      curl -L -o "${BASE}.csv" "${CSV[$Y]}"
      python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED); z.write(sys.argv[1], arcname=sys.argv[1]); z.close()" "${BASE}.csv" "${BASE}.zip"
-     rm "${BASE}.csv"    # delete CSV to save disk; keep only the zip
+     rm "${BASE}.csv"
    done
    cd -
    ```
 
-   Zipping a ~4 GB CSV in Python takes a few minutes each; deleting each CSV after zipping keeps
-   peak disk under ~5 GB (fits a default 32 GB Codespace). For a quick demo, keep just one or two
-   years in the loop.
-
-   > **If a CSV URL 404s** (CMS republishes periodically), open the
-   > [CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug),
-   > open **DevTools → Network**, click that year's **Download**, and copy the request URL ending in
-   > `.csv` (a `data.cms.gov/sites/default/files/…` path). Substitute it into the map above.
+   </details>
 
 2. Verify (each should be hundreds of MB, not 3 KB):
 
@@ -86,8 +94,8 @@ Keeps the transfer cloud-to-cloud (CMS → Codespace), so it doesn't go through 
    ls -lh data/DemoZippedFiles/*.zip
    ```
 
-> 💡 **Or let an AI agent do it:** paste the copied CMS URL to `copilot` or `claude` and ask it to
-> download the file into `data/DemoZippedFiles/` with the correct `..._YYYY.zip` name.
+> 💡 **Or let an AI agent do it:** run `copilot` or `claude` and ask it to run `fetch-medicare-data.sh`
+> (or download a specific year) into `data/DemoZippedFiles/`.
 
 ### Option B — Upload zips you already downloaded
 
@@ -214,10 +222,20 @@ deployment path:
 ./deploy-medicare-to-workspace.sh
 ```
 
-**Or let an AI agent drive it:**
+**Or let an AI agent drive it (autopilot):**
 ```bash
 copilot   # or: claude
-# then: Read config/variables.env and follow context/buildfabricworkspace.md and context/LoadMedicareData.md
+```
+Then paste:
+```
+Deploy this Medicare solution to the existing Microsoft Fabric workspace configured in
+config/variables.env. Detect whether the environment is Windows, macOS, Linux, or GitHub
+Codespaces and run the appropriate PowerShell or Bash deployment script. Work on autopilot:
+validate Azure authentication, workspace access, active Fabric capacity, required ZIP files,
+and notebooks; reuse existing Fabric items and uploaded files where safe; recover from
+transient failures without duplicating jobs; run both notebooks; and verify that
+mcpd.medicarepartd exists. Do not create a new workspace or capacity. Only stop if
+interactive authentication or another action that only I can perform is required.
 ```
 
 > The PowerShell equivalents (`pwsh ./deploy-medicare-e2e.ps1`) also work inside the

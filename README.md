@@ -125,13 +125,22 @@ The Codespace **auto-creates `config/variables.env`** for you from the template 
 
 ### 4. Get the Medicare zip file(s) into the Codespace
 
-The zips aren't in the repo (they're gitignored), so a fresh Codespace starts empty. Fetch them **directly into the cloud** — see [Getting the Data](#getting-the-data) below (the "GitHub Codespaces / Dev Container" method downloads straight from CMS into `data/DemoZippedFiles/`). For a quick demo, one or two years is enough.
+The zips aren't in the repo (they're gitignored), so a fresh Codespace starts empty. Run the fetch
+helper to pull the data straight from CMS into `data/DemoZippedFiles/` (cloud-to-cloud):
+
+```bash
+./fetch-medicare-data.sh 2024 2023    # one or two years is plenty for a demo
+```
+See [Getting the Data](#getting-the-data) for how it works and what to do if a CMS URL changes.
 
 ### 5. Deploy
 
 ```bash
 ./deploy-medicare-to-workspace.sh        # existing workspace (you set WS_ID)
 ```
+> Prefer to let the AI agent drive it hands-off? Run `copilot` (or `claude`) and paste the
+> **Autopilot** prompt from [Option C](#option-c-ai-coding-agent-github-copilot-cli-or-claude-code).
+
 > Full deployment that also creates the Resource Group, Capacity, and Workspace? Fill the admin section of `config/variables.env`, then run `./deploy-medicare-e2e.sh`. See [Step 6](#step-6--choose-how-to-run-it) for all run options (including letting an AI agent drive it).
 
 That's the whole flow — no local setup. For a deeper, screenshot-guided version see the [Dev Container Quick Start](.devcontainer/README.md).
@@ -202,18 +211,32 @@ fetch the zips yourself.
 > happened.) Instead, download the underlying **CSV** — a real, static, curl-able file — and zip it
 > yourself with the correct inner name, as shown below.
 
-#### Local VS Code (on your machine)
+#### Easiest: the helper script (any platform)
 
-Easiest: open the
-[CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data),
-click **Download** for each year you want, then repackage each downloaded `MUP_DPR_..._NPIBN.csv`
-into a zip whose inner file is renamed to `Medicare_Part_D_Prescribers_by_Provider_and_Drug_YYYY.csv`.
-Or just use the terminal recipe below (it works on macOS/Linux/WSL too).
+From the repo root, run the fetch helper — it downloads each year's CSV and repackages it into a
+correctly-named zip in `data/DemoZippedFiles/`, deleting each CSV afterward to save disk:
 
-#### GitHub Codespaces / Dev Container (or any terminal)
+```bash
+# macOS / Linux / GitHub Codespaces / WSL
+./fetch-medicare-data.sh              # default years: 2024 2023 2022
+./fetch-medicare-data.sh 2024 2023    # only these years
+```
 
-Download the static CSV, then zip it with the correct inner name — cloud-to-cloud, straight into the
-Codespace. The CSV URLs below are verified working (each is 3.7–4.1 GB):
+```powershell
+# Windows (PowerShell 7+)
+pwsh ./fetch-medicare-data.ps1                 # default years: 2024, 2023, 2022
+pwsh ./fetch-medicare-data.ps1 -Years 2024,2023
+```
+
+Then verify (each should be hundreds of MB, not 3 KB): `ls -lh data/DemoZippedFiles/*.zip`.
+
+> **Tip:** For a quick demo, just grab one or two years (e.g. `2024 2023`). Each CSV is ~4 GB and
+> zipping takes a few minutes per year.
+
+#### Manual recipe (what the helper does, for reference)
+
+If you'd rather run it by hand or need a year the helper doesn't list, download the static CSV then
+zip it with the correct inner name — the CSV URLs below are verified working (each is 3.7–4.1 GB):
 
 ```bash
 cd data/DemoZippedFiles
@@ -233,19 +256,16 @@ done
 cd -
 ```
 
-Zipping a ~4 GB CSV in Python takes a few minutes each; deleting each CSV after zipping keeps peak
-disk under ~5 GB (fits a default 32 GB Codespace).
-
 > **If a CSV URL 404s** (CMS republishes periodically), get the current link: open the
 > [CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug),
 > open your browser's **DevTools → Network** tab, click **Download**, and copy the request URL
-> ending in `.csv` (a `data.cms.gov/sites/default/files/…` path). Substitute it into the map above.
+> ending in `.csv` (a `data.cms.gov/sites/default/files/…` path). Substitute it into the map (or into
+> `fetch-medicare-data.sh` / `.ps1`).
 
-Verify with `ls -lh data/DemoZippedFiles/*.zip`. Full options (including
-uploading zips you already have, or letting an AI agent do the download) are in the
-[Dev Container Quick Start](.devcontainer/README.md#-getting-the-medicare-data-into-the-codespace).
+Full options (including uploading zips you already have, or letting an AI agent do the download) are
+in the [Dev Container Quick Start](.devcontainer/README.md#-getting-the-medicare-data-into-the-codespace).
 
-> **Tip:** For a quick demo, just grab one or two years (e.g. 2023 and 2022). A full 11-file set is ~8 GB.
+> **Tip:** For a quick demo, just grab one or two years (e.g. 2024 and 2023). A full multi-year set is several GB.
 
 ### Step 5 — Login to Azure
 
@@ -304,6 +324,22 @@ claude
 ```
 
 Once the agent is running, give it a prompt that references the context and config files. For example:
+
+**Autopilot (recommended — cross-platform, hands-off):** once you've set `WS_ID` in
+`config/variables.env` and the zip files are in `data/DemoZippedFiles/`, this prompt lets the agent
+pick the right script for your OS and drive the whole deployment, only pausing for things it can't do
+(like interactive login):
+
+```
+Deploy this Medicare solution to the existing Microsoft Fabric workspace configured in
+config/variables.env. Detect whether the environment is Windows, macOS, Linux, or GitHub
+Codespaces and run the appropriate PowerShell or Bash deployment script. Work on autopilot:
+validate Azure authentication, workspace access, active Fabric capacity, required ZIP files,
+and notebooks; reuse existing Fabric items and uploaded files where safe; recover from
+transient failures without duplicating jobs; run both notebooks; and verify that
+mcpd.medicarepartd exists. Do not create a new workspace or capacity. Only stop if
+interactive authentication or another action that only I can perform is required.
+```
 
 **Full deployment (new infrastructure + data load):**
 ```
@@ -370,6 +406,8 @@ The [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric
 ├── deploy-medicare-e2e.ps1                # Full deployment — PowerShell (Windows-native)
 ├── deploy-medicare-to-workspace.sh        # Existing workspace — bash (Contributor access)
 ├── deploy-medicare-to-workspace.ps1       # Existing workspace — PowerShell (Windows-native)
+├── fetch-medicare-data.sh                 # Download CMS CSVs + repackage into zips — bash
+├── fetch-medicare-data.ps1                # Download CMS CSVs + repackage into zips — PowerShell
 ├── medicare-common.ps1                    # Shared helpers for the PowerShell scripts
 ├── pyproject.toml                         # Python project config (for uv; bash scripts only)
 ├── .gitignore
