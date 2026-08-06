@@ -37,37 +37,50 @@ By the end of this chapter, you'll have:
 The zip files are large and **not committed to the repo** (`*.zip` is gitignored), so they won't
 be present in a fresh Codespace. Get them into `data/DemoZippedFiles/` using whichever path fits.
 
-> **⚠️ Filename matters.** The deploy scripts auto-detect years by looking for files named
-> **`Medicare_Part_D_Prescribers_by_Provider_and_Drug_YYYY.zip`** (e.g. `..._2023.zip`). The
-> CMS per-year **Download** button already produces this name. If a file lands with a different
-> name (e.g. a raw `MUP_DPR_RY24_...zip`), rename it to match or it will be skipped.
+> **⚠️ Names matter.** The deploy scripts auto-detect years from the zip name
+> **`Medicare_Part_D_Prescribers_by_Provider_and_Drug_YYYY.zip`**, and the load notebook reads the
+> zip's **inner** file expecting a single CSV named
+> **`Medicare_Part_D_Prescribers_by_Provider_and_Drug_YYYY.csv`**. Both must match exactly.
 
 ### Option A — Download straight into the Codespace (recommended)
 
 Keeps the transfer cloud-to-cloud (CMS → Codespace), so it doesn't go through your home connection.
 
-1. In the Codespace terminal, `curl` each year into the data folder. The download URL follows a
-   simple pattern — the **most recent year** is the base `.../data` path (no year), and **older
-   years** append `/YYYY`:
+> **⚠️ You can't `curl` the CMS "Download" button** — that page runs JavaScript, so `curl` only
+> saves the ~3 KB HTML web page (if a "zip" is ~3 KB, that's what happened). Instead download the
+> underlying **CSV** (a static, curl-able file) and zip it with the correct inner name.
+
+1. In the Codespace terminal, download each year's CSV and repackage it. The CSV URLs below are
+   verified working (each is 3.7–4.1 GB):
 
    ```bash
-   # Most recent year (2024) — base /data path, NO year suffix
-   curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2024.zip" \
-     "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data"
+   cd data/DemoZippedFiles
 
-   # Older years — append /YYYY
-   curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" \
-     "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data/2023"
+   declare -A CSV=(
+     [2024]="https://data.cms.gov/sites/default/files/2026-05/0ae165f4-eb44-495d-8cac-67f4571b6b83/MUP_DPR_RY26_P04_V10_DY24_NPIBN.csv"
+     [2023]="https://data.cms.gov/sites/default/files/2025-04/0d5915ce-002c-4d87-bde8-24ffb08bb6cc/MUP_DPR_RY25_P04_V10_DY23_NPIBN.csv"
+     [2022]="https://data.cms.gov/sites/default/files/2024-05/18f82097-61a6-4889-9941-9a0b6ad7523c/MUP_DPR_RY24_P04_V10_DY22_NPIBN.csv"
+   )
 
-   curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2022.zip" \
-     "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data/2022"
+   for Y in 2024 2023 2022; do
+     BASE="Medicare_Part_D_Prescribers_by_Provider_and_Drug_${Y}"
+     curl -L -o "${BASE}.csv" "${CSV[$Y]}"
+     python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED); z.write(sys.argv[1], arcname=sys.argv[1]); z.close()" "${BASE}.csv" "${BASE}.zip"
+     rm "${BASE}.csv"    # delete CSV to save disk; keep only the zip
+   done
+   cd -
    ```
 
-   > If a year saves a tiny (~3 KB) HTML file instead of a ~800 MB `.zip`, open the
-   > [CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data),
-   > **right-click that year's Download button → Copy link address**, and use that URL instead.
+   Zipping a ~4 GB CSV in Python takes a few minutes each; deleting each CSV after zipping keeps
+   peak disk under ~5 GB (fits a default 32 GB Codespace). For a quick demo, keep just one or two
+   years in the loop.
 
-2. Verify:
+   > **If a CSV URL 404s** (CMS republishes periodically), open the
+   > [CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug),
+   > open **DevTools → Network**, click that year's **Download**, and copy the request URL ending in
+   > `.csv` (a `data.cms.gov/sites/default/files/…` path). Substitute it into the map above.
+
+2. Verify (each should be hundreds of MB, not 3 KB):
 
    ```bash
    ls -lh data/DemoZippedFiles/*.zip

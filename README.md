@@ -192,44 +192,54 @@ The zip files are large and **gitignored**, so they are never committed to the r
 fresh clone (local) or a fresh Codespace starts with an empty `data/DemoZippedFiles/` folder — you
 fetch the zips yourself.
 
-> **⚠️ Filename matters.** The scripts auto-detect years by looking for files named
-> **`Medicare_Part_D_Prescribers_by_Provider_and_Drug_YYYY.zip`** (e.g. `..._2023.zip`). The CMS
-> per-year **Download** button already produces this name. If a file lands with a different name,
-> rename it to match or it will be skipped.
+> **⚠️ Names matter.** The scripts auto-detect years from the zip name
+> **`Medicare_Part_D_Prescribers_by_Provider_and_Drug_YYYY.zip`**, and the load notebook reads the
+> zip's **inner** file expecting a single CSV named
+> **`Medicare_Part_D_Prescribers_by_Provider_and_Drug_YYYY.csv`**. Both must match exactly.
 
-**How to grab a year's download link (both audiences):** open the
-[CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data),
-pick a year, then **right-click the Download button → Copy link address**.
+> **⚠️ You can't `curl` the CMS "Download" button.** That page's Download button runs JavaScript,
+> so `curl` only saves the ~3 KB HTML web page — not the data. (If a "zip" is ~3 KB, that's what
+> happened.) Instead, download the underlying **CSV** — a real, static, curl-able file — and zip it
+> yourself with the correct inner name, as shown below.
 
 #### Local VS Code (on your machine)
 
-Use the browser **Download** button for each year you want, then move the `.zip` files into the
-repo's `data/DemoZippedFiles/` folder. (You can also `curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" "<copied-URL>"` if you prefer the terminal.)
-Because the folder is a normal local path, this is the same directory the scripts read.
+Easiest: open the
+[CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data),
+click **Download** for each year you want, then repackage each downloaded `MUP_DPR_..._NPIBN.csv`
+into a zip whose inner file is renamed to `Medicare_Part_D_Prescribers_by_Provider_and_Drug_YYYY.csv`.
+Or just use the terminal recipe below (it works on macOS/Linux/WSL too).
 
-#### GitHub Codespaces / Dev Container
+#### GitHub Codespaces / Dev Container (or any terminal)
 
-There's no local browser inside the container, so download **directly into the Codespace** — this
-keeps the transfer cloud-to-cloud (CMS → Codespace) instead of routing through your home connection.
-The per-year download URL follows a simple pattern: the **most recent year** is the base `.../data`
-path (no year), and **older years** add `/YYYY`:
+Download the static CSV, then zip it with the correct inner name — cloud-to-cloud, straight into the
+Codespace. The CSV URLs below are verified working (each is 3.7–4.1 GB):
 
 ```bash
-# Most recent year (2024) — note: base /data path, NO year suffix
-curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2024.zip" \
-  "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data"
+cd data/DemoZippedFiles
 
-# Older years — append /YYYY
-curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" \
-  "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data/2023"
+declare -A CSV=(
+  [2024]="https://data.cms.gov/sites/default/files/2026-05/0ae165f4-eb44-495d-8cac-67f4571b6b83/MUP_DPR_RY26_P04_V10_DY24_NPIBN.csv"
+  [2023]="https://data.cms.gov/sites/default/files/2025-04/0d5915ce-002c-4d87-bde8-24ffb08bb6cc/MUP_DPR_RY25_P04_V10_DY23_NPIBN.csv"
+  [2022]="https://data.cms.gov/sites/default/files/2024-05/18f82097-61a6-4889-9941-9a0b6ad7523c/MUP_DPR_RY24_P04_V10_DY22_NPIBN.csv"
+)
 
-curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2022.zip" \
-  "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data/2022"
+for Y in 2024 2023 2022; do
+  BASE="Medicare_Part_D_Prescribers_by_Provider_and_Drug_${Y}"
+  curl -L -o "${BASE}.csv" "${CSV[$Y]}"
+  python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED); z.write(sys.argv[1], arcname=sys.argv[1]); z.close()" "${BASE}.csv" "${BASE}.zip"
+  rm "${BASE}.csv"    # delete CSV to save disk; keep only the zip
+done
+cd -
 ```
 
-> If a year saves a tiny (~3 KB) HTML file instead of a ~800 MB `.zip`, grab the link straight from
-> the page instead: open the [CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data),
-> **right-click the Download button → Copy link address**, and use that URL.
+Zipping a ~4 GB CSV in Python takes a few minutes each; deleting each CSV after zipping keeps peak
+disk under ~5 GB (fits a default 32 GB Codespace).
+
+> **If a CSV URL 404s** (CMS republishes periodically), get the current link: open the
+> [CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug),
+> open your browser's **DevTools → Network** tab, click **Download**, and copy the request URL
+> ending in `.csv` (a `data.cms.gov/sites/default/files/…` path). Substitute it into the map above.
 
 Verify with `ls -lh data/DemoZippedFiles/*.zip`. Full options (including
 uploading zips you already have, or letting an AI agent do the download) are in the
