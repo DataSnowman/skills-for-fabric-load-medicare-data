@@ -67,6 +67,19 @@ if ([string]::IsNullOrWhiteSpace($wsName)) {
 }
 Write-Ok "Workspace: $wsName ($WsId)"
 
+# Verify the workspace's assigned capacity is Active (never creates/modifies one)
+$capacityId = Invoke-Az @('rest','--resource',$FabricApi,'--url',"$FabricApi/v1/workspaces/$WsId",
+    '--query','capacityId','--output','tsv')
+if ([string]::IsNullOrWhiteSpace($capacityId) -or $capacityId -eq 'None') {
+    Write-Fail "Workspace $WsId has no assigned capacity. Assign an existing capacity before deploying."
+}
+$capacityState = Invoke-Az @('rest','--resource',$FabricApi,'--url',"$FabricApi/v1/capacities",
+    '--query',"value[?id=='$capacityId'].state | [0]",'--output','tsv')
+if ($capacityState -ne 'Active') {
+    Write-Fail "Workspace capacity $capacityId is not Active (state: $capacityState). Resume it before deploying; this script will not create/modify capacities."
+}
+Write-Ok "Workspace capacity is Active ($capacityId)"
+
 if (-not (Test-Path -LiteralPath $ZipSourceDir)) { Write-Fail "Zip directory not found: $ZipSourceDir" }
 $zipCount = (Get-ChildItem -LiteralPath $ZipSourceDir -Filter '*.zip' -ErrorAction SilentlyContinue).Count
 if ($zipCount -eq 0) { Write-Fail "No zip files found in $ZipSourceDir" }
@@ -112,16 +125,16 @@ $loadNbId  = Deploy-Notebook -Name 'LoadMedicarePartDfiles' -WsId $WsId -TmpDir 
 # ─── STEP 4: RUN UNZIP NOTEBOOK ───────────────────────────────────────────────
 
 Write-Log 'Step 4 - Run UnzipMedicareFiles notebook'
-$unzipJobId = Submit-NotebookJob -WsId $WsId -NbId $unzipNbId
-if ([string]::IsNullOrWhiteSpace($unzipJobId)) { Write-Fail 'Could not submit unzip notebook job' }
-Wait-FabricJob -WsId $WsId -ItemId $unzipNbId -JobId $unzipJobId -Label 'UnzipMedicareFiles' -MaxPolls 60 -IntervalSec 30
+if (Test-RawCsvsPresent -WsId $WsId -LhId $lhId -Years $years) {
+    Write-Ok "Raw CSVs for all years ($($years -join ', ')) already present, skipping unzip run"
+} else {
+    Invoke-NotebookJob -WsId $WsId -NbId $unzipNbId -Label 'UnzipMedicareFiles' -MaxPolls 60 -IntervalSec 30
+}
 
 # ─── STEP 5: RUN LOAD NOTEBOOK ────────────────────────────────────────────────
 
 Write-Log 'Step 5 - Run LoadMedicarePartDfiles notebook'
-$loadJobId = Submit-NotebookJob -WsId $WsId -NbId $loadNbId
-if ([string]::IsNullOrWhiteSpace($loadJobId)) { Write-Fail 'Could not submit load notebook job' }
-Wait-FabricJob -WsId $WsId -ItemId $loadNbId -JobId $loadJobId -Label 'LoadMedicarePartDfiles' -MaxPolls 120 -IntervalSec 30
+Invoke-NotebookJob -WsId $WsId -NbId $loadNbId -Label 'LoadMedicarePartDfiles' -MaxPolls 120 -IntervalSec 30
 
 # ─── STEP 6: VERIFY ───────────────────────────────────────────────────────────
 

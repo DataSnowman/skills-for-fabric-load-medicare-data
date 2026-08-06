@@ -142,7 +142,7 @@ function Get-ZipYears {
     return ($years | Sort-Object -Unique)
 }
 
-# ─── OneLake upload (streamed via curl.exe, idempotent HEAD skip) ─────────────
+# ─── OneLake upload (streamed via curl.exe, idempotent size-match skip) ───────
 
 function Send-ZipsToOneLake {
     param(
@@ -164,9 +164,11 @@ function Send-ZipsToOneLake {
         $sizeMb = [int]($zip.Length / 1MB)
         $url    = "$OneLakeBlob/$WsId/$LhId/Files/medicare/$name"
 
-        $headCode = & curl.exe -s -o NUL -w '%{http_code}' -I `
+        $headCode = & curl.exe -s -I `
             -H $auth -H 'x-ms-version: 2023-01-03' $url
-        if ($headCode -eq '200') {
+        $remoteSize = ($headCode -split "`n" | Where-Object { $_ -match '^(?i)content-length:' } |
+            Select-Object -First 1) -replace '(?i)content-length:\s*','' -replace '\s',''
+        if ($remoteSize -and ([int64]$remoteSize -eq [int64]$zip.Length)) {
             Write-Host "  Skipping $name (${sizeMb}MB) - already uploaded"
             $skipped++
             continue
@@ -177,6 +179,13 @@ function Send-ZipsToOneLake {
             -H $auth -H 'x-ms-version: 2023-01-03' -H 'x-ms-blob-type: BlockBlob' `
             --data-binary "@$($zip.FullName)" $url
         Write-Host $httpCode
+        if ($httpCode -ne '201') {
+            Write-Host "  Retrying $name... " -NoNewline
+            $httpCode = & curl.exe -s -o NUL -w '%{http_code}' -X PUT `
+                -H $auth -H 'x-ms-version: 2023-01-03' -H 'x-ms-blob-type: BlockBlob' `
+                --data-binary "@$($zip.FullName)" $url
+            Write-Host $httpCode
+        }
         if ($httpCode -ne '201') { $failures++ }
     }
 
@@ -354,6 +363,50 @@ function Submit-NotebookJob {
     return ''
 }
 
+function Get-ActiveNotebookJob {
+    <# Returns the id of an in-flight (NotStarted/Running) RunNotebook job for this
+       notebook, or '' if none — so we never submit a duplicate job on retry/resume. #>
+    param([Parameter(Mandatory)][string]$WsId,[Parameter(Mandatory)][string]$ItemId)
+    $id = Invoke-Az @('rest','--resource',$FabricApi,
+        '--url',"$FabricApi/v1/workspaces/$WsId/items/$ItemId/jobs/instances?jobType=RunNotebook",
+        '--query',"value[?status=='NotStarted' || status=='Running'].id | [0]",'--output','tsv')
+    if ([string]::IsNullOrWhiteSpace($id)) { return '' }
+    return $id
+}
+
+function Invoke-NotebookJob {
+    <#
+        Runs a notebook, reusing an in-flight job instead of submitting a duplicate.
+        If job-id parsing after submission fails transiently, polls for the job to appear
+        rather than blindly resubmitting (which would create a real duplicate Spark run).
+    #>
+    param(
+        [Parameter(Mandatory)][string]$WsId,
+        [Parameter(Mandatory)][string]$NbId,
+        [Parameter(Mandatory)][string]$Label,
+        [int]$MaxPolls = 120,
+        [int]$IntervalSec = 30
+    )
+    $jobId = Get-ActiveNotebookJob -WsId $WsId -ItemId $NbId
+    if (-not [string]::IsNullOrWhiteSpace($jobId)) {
+        Write-Info "$Label already has an in-flight job, reattaching instead of resubmitting"
+    } else {
+        $jobId = Submit-NotebookJob -WsId $WsId -NbId $NbId
+        if ([string]::IsNullOrWhiteSpace($jobId)) {
+            Write-Info "Could not parse job id for $Label submission, checking for the job before retrying..."
+            for ($i = 0; $i -lt 6; $i++) {
+                Start-Sleep -Seconds 5
+                $jobId = Get-ActiveNotebookJob -WsId $WsId -ItemId $NbId
+                if (-not [string]::IsNullOrWhiteSpace($jobId)) { break }
+            }
+            # Only resubmit if we're sure no job was actually created.
+            if ([string]::IsNullOrWhiteSpace($jobId)) { $jobId = Submit-NotebookJob -WsId $WsId -NbId $NbId }
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($jobId)) { Write-Fail "Could not submit $Label job" }
+    Wait-FabricJob -WsId $WsId -ItemId $NbId -JobId $jobId -Label $Label -MaxPolls $MaxPolls -IntervalSec $IntervalSec
+}
+
 function Wait-FabricJob {
     param(
         [Parameter(Mandatory)][string]$WsId,
@@ -380,6 +433,23 @@ function Wait-FabricJob {
 }
 
 # ─── Delta table verification ─────────────────────────────────────────────────
+
+function Test-RawCsvsPresent {
+    <# True if every year's raw CSV already exists under Files/medicare/ in the lakehouse,
+       so a re-run doesn't redo (or duplicate-run) the unzip job. #>
+    param(
+        [Parameter(Mandatory)][string]$WsId,
+        [Parameter(Mandatory)][string]$LhId,
+        [Parameter(Mandatory)][int[]]$Years
+    )
+    $token = Get-StorageToken
+    $listing = & curl.exe -s -H "Authorization: Bearer $token" -H 'x-ms-version: 2023-01-03' `
+        "$OneLakeBlob/$WsId/$LhId/Files?restype=container&comp=list&prefix=medicare&maxresults=200" | Out-String
+    foreach ($y in $Years) {
+        if ($listing -notmatch "$([regex]::Escape($FilePrefix))_$y\.csv") { return $false }
+    }
+    return $true
+}
 
 function Test-DeltaTable {
     param([Parameter(Mandatory)][string]$WsId,[Parameter(Mandatory)][string]$LhId)

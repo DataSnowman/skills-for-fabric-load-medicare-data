@@ -44,9 +44,17 @@ LAKEHOUSE_NAME="${LAKEHOUSE_NAME:-MedicarePartD}"
 ZIP_SOURCE_DIR="$SCRIPT_DIR/data/DemoZippedFiles"
 NOTEBOOK_DIR="$SCRIPT_DIR/notebooks"
 
-# All 11 years of Medicare Part D files
-YEARS=(2013 2014 2015 2016 2017 2018 2019 2020 2021 2022 2023)
 FILE_PREFIX="Medicare_Part_D_Prescribers_by_Provider_and_Drug"
+
+# Years to process — auto-detected from zip files present in ZIP_SOURCE_DIR
+# Drop in 1 to 11 zip files and this will pick them all up automatically
+YEARS=()
+for _zip in "$ZIP_SOURCE_DIR"/${FILE_PREFIX}_*.zip; do
+  [[ -f "$_zip" ]] || continue
+  _year=$(basename "$_zip" .zip | grep -oE '[0-9]{4}$')
+  [[ -n "$_year" ]] && YEARS+=("$_year")
+done
+IFS=$'\n' YEARS=($(sort <<<"${YEARS[*]}")); unset IFS
 
 # ─── HELPER FUNCTIONS ────────────────────────────────────────────────────────
 
@@ -77,11 +85,50 @@ poll_job() {
 
 submit_notebook_job() {
   local ws_id=$1 nb_id=$2
-  az rest --method post \
+  local resp
+  resp=$(az rest --method post \
     --resource "https://api.fabric.microsoft.com" \
     --url "https://api.fabric.microsoft.com/v1/workspaces/$ws_id/items/$nb_id/jobs/instances?jobType=RunNotebook" \
     --body '{}' \
-    --verbose 2>&1 | grep "'Location'" | grep -oE '[0-9a-f-]{36}' | tail -1
+    --verbose 2>&1)
+  echo "$resp" | grep "'Location'" | grep -oE '[0-9a-f-]{36}' | tail -1
+}
+
+# Returns the job id of an already in-flight (NotStarted/Running) run of this
+# notebook, if any, so we never submit a duplicate job on retry/resume.
+get_active_job() {
+  local ws_id=$1 item_id=$2
+  az rest --resource "https://api.fabric.microsoft.com" \
+    --url "https://api.fabric.microsoft.com/v1/workspaces/$ws_id/items/$item_id/jobs/instances?jobType=RunNotebook" \
+    --query "value[?status=='NotStarted' || status=='Running'].id | [0]" \
+    --output tsv 2>/dev/null || echo ""
+}
+
+# Runs a notebook, reusing an in-flight job instead of submitting a duplicate.
+# If job-id parsing after submission fails transiently, we poll for the job
+# to appear rather than blindly resubmitting (which would create a real
+# duplicate Spark run).
+run_notebook_job() {
+  local ws_id=$1 nb_id=$2 label=$3 max_polls=$4 interval=$5
+  local job_id
+  job_id=$(get_active_job "$ws_id" "$nb_id")
+  if [[ -n "$job_id" ]]; then
+    info "$label already has an in-flight job, reattaching instead of resubmitting"
+  else
+    job_id=$(submit_notebook_job "$ws_id" "$nb_id")
+    if [[ -z "$job_id" ]]; then
+      info "Could not parse job id for $label submission, checking for the job before retrying..."
+      for i in {1..6}; do
+        sleep 5
+        job_id=$(get_active_job "$ws_id" "$nb_id")
+        [[ -n "$job_id" ]] && break
+      done
+      # Only resubmit if we're sure no job was actually created.
+      [[ -n "$job_id" ]] || job_id=$(submit_notebook_job "$ws_id" "$nb_id")
+    fi
+  fi
+  [[ -n "$job_id" ]] || fail "Could not submit $label job"
+  poll_job "$ws_id" "$nb_id" "$job_id" "$label" "$max_polls" "$interval"
 }
 
 # ─── STEP 0: PREFLIGHT ──────────────────────────────────────────────────────
@@ -100,9 +147,24 @@ WS_NAME=$(az rest --resource "https://api.fabric.microsoft.com" \
   --query "displayName" --output tsv 2>&1) || fail "Cannot access workspace $WS_ID. Check the ID and your permissions."
 ok "Workspace: $WS_NAME ($WS_ID)"
 
+# Verify the workspace's assigned capacity is Active (never creates one)
+CAPACITY_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
+  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID" \
+  --query "capacityId" --output tsv 2>&1) || fail "Could not read capacity for workspace $WS_ID"
+if [[ -n "$CAPACITY_ID" && "$CAPACITY_ID" != "None" ]]; then
+  CAPACITY_STATE=$(az rest --resource "https://api.fabric.microsoft.com" \
+    --url "https://api.fabric.microsoft.com/v1/capacities" \
+    --query "value[?id=='$CAPACITY_ID'].state | [0]" --output tsv 2>&1)
+  [[ "$CAPACITY_STATE" == "Active" ]] || fail "Workspace capacity $CAPACITY_ID is not Active (state: $CAPACITY_STATE). Resume it before deploying; this script will not create/modify capacities."
+  ok "Workspace capacity is Active ($CAPACITY_ID)"
+else
+  fail "Workspace $WS_ID has no assigned capacity. Assign an existing capacity before deploying."
+fi
+
 [[ -d "$ZIP_SOURCE_DIR" ]] || fail "Zip directory not found: $ZIP_SOURCE_DIR"
 ZIP_COUNT=$(ls "$ZIP_SOURCE_DIR"/*.zip 2>/dev/null | wc -l | tr -d ' ')
-ok "Found $ZIP_COUNT zip files in $ZIP_SOURCE_DIR"
+[[ ${#YEARS[@]} -gt 0 ]] || fail "No zip files matching ${FILE_PREFIX}_YYYY.zip found in $ZIP_SOURCE_DIR"
+ok "Found $ZIP_COUNT zip file(s) in $ZIP_SOURCE_DIR — years: ${YEARS[*]}"
 
 [[ -d "$NOTEBOOK_DIR" ]] || fail "Notebook directory not found: $NOTEBOOK_DIR"
 [[ -f "$NOTEBOOK_DIR/UnzipMedicareFiles.ipynb" ]] || fail "UnzipMedicareFiles.ipynb not found"
@@ -113,13 +175,20 @@ ok "Both notebooks found"
 
 log "Step 1 — Create Lakehouse ($LAKEHOUSE_NAME)"
 
-LH_ID=$(az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
+LH_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
   --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
-  --body "{\"displayName\": \"$LAKEHOUSE_NAME\", \"type\": \"Lakehouse\", \"creationPayload\": {\"enableSchemas\": true}}" \
-  --query "id" --output tsv)
+  --query "value[?displayName=='$LAKEHOUSE_NAME' && type=='Lakehouse'].id | [0]" --output tsv 2>/dev/null || echo "")
 
-ok "Lakehouse ID: $LH_ID"
+if [[ -n "$LH_ID" ]]; then
+  ok "Lakehouse already exists, reusing: $LH_ID"
+else
+  LH_ID=$(az rest --method post \
+    --resource "https://api.fabric.microsoft.com" \
+    --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
+    --body "{\"displayName\": \"$LAKEHOUSE_NAME\", \"type\": \"Lakehouse\", \"creationPayload\": {\"enableSchemas\": true}}" \
+    --query "id" --output tsv)
+  ok "Lakehouse created: $LH_ID"
+fi
 
 # ─── STEP 2: UPLOAD ZIP FILES TO ONELAKE ────────────────────────────────────
 
@@ -130,9 +199,27 @@ STORAGE_TOKEN=$(az account get-access-token \
   --query accessToken --output tsv)
 
 UPLOAD_FAILURES=0
+UPLOAD_SKIPPED=0
 for ZIP_FILE in "$ZIP_SOURCE_DIR"/*.zip; do
   FILENAME=$(basename "$ZIP_FILE")
-  SIZE_MB=$(( $(stat -f%z "$ZIP_FILE" 2>/dev/null || stat --printf="%s" "$ZIP_FILE") / 1024 / 1024 ))
+  LOCAL_SIZE=$(stat -f%z "$ZIP_FILE" 2>/dev/null || stat --printf="%s" "$ZIP_FILE")
+  SIZE_MB=$(( LOCAL_SIZE / 1024 / 1024 ))
+
+  # Skip re-upload if a blob of the same size already exists (recovers from
+  # transient re-runs without re-uploading hundreds of MB unnecessarily; a
+  # size mismatch — e.g. a prior partial upload — triggers a re-upload).
+  REMOTE_SIZE=$(curl -s -I \
+    -H "Authorization: Bearer $STORAGE_TOKEN" \
+    -H "x-ms-version: 2023-01-03" \
+    "https://onelake.blob.fabric.microsoft.com/$WS_ID/$LH_ID/Files/medicare/$FILENAME" \
+    | tr -d '\r' | { grep -i '^content-length:' || true; } | awk '{print $2}')
+
+  if [[ -n "$REMOTE_SIZE" && "$REMOTE_SIZE" == "$LOCAL_SIZE" ]]; then
+    echo "  Skipping $FILENAME (${SIZE_MB}MB) — already uploaded"
+    UPLOAD_SKIPPED=$((UPLOAD_SKIPPED + 1))
+    continue
+  fi
+
   echo -n "  Uploading $FILENAME (${SIZE_MB}MB)... "
 
   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
@@ -143,11 +230,21 @@ for ZIP_FILE in "$ZIP_SOURCE_DIR"/*.zip; do
     "https://onelake.blob.fabric.microsoft.com/$WS_ID/$LH_ID/Files/medicare/$FILENAME")
 
   echo "$HTTP_CODE"
+  if [[ "$HTTP_CODE" != "201" ]]; then
+    echo -n "  Retrying $FILENAME... "
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+      -H "Authorization: Bearer $STORAGE_TOKEN" \
+      -H "x-ms-version: 2023-01-03" \
+      -H "x-ms-blob-type: BlockBlob" \
+      --data-binary @"$ZIP_FILE" \
+      "https://onelake.blob.fabric.microsoft.com/$WS_ID/$LH_ID/Files/medicare/$FILENAME")
+    echo "$HTTP_CODE"
+  fi
   [[ "$HTTP_CODE" == "201" ]] || UPLOAD_FAILURES=$((UPLOAD_FAILURES + 1))
 done
 
 [[ $UPLOAD_FAILURES -eq 0 ]] || fail "$UPLOAD_FAILURES file(s) failed to upload"
-ok "All zip files uploaded"
+ok "All zip files present in OneLake ($UPLOAD_SKIPPED skipped, already uploaded)"
 
 # ─── STEP 3: PREPARE AND DEPLOY NOTEBOOKS ───────────────────────────────────
 
@@ -278,59 +375,83 @@ for nb, name in [(unzip_nb, 'UnzipMedicareFiles'), (load_nb, 'LoadMedicarePartDf
 
 PYEOF
 
-# Deploy UnzipMedicareFiles
-info "Deploying UnzipMedicareFiles..."
-az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
-  --body @$TMPDIR/UnzipMedicareFiles_deploy_body.json > /dev/null 2>&1
+deploy_or_update_notebook() {
+  local name=$1
+  local nb_id
+  nb_id=$(az rest --resource "https://api.fabric.microsoft.com" \
+    --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
+    --query "value[?displayName=='$name'].id | [0]" --output tsv 2>/dev/null || echo "")
 
-UNZIP_NB_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
-  --query "value[?displayName=='UnzipMedicareFiles'].id | [0]" --output tsv)
-ok "UnzipMedicareFiles deployed: $UNZIP_NB_ID"
+  if [[ -n "$nb_id" ]]; then
+    info "$name already exists, updating definition..." >&2
+    az rest --method post \
+      --resource "https://api.fabric.microsoft.com" \
+      --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$nb_id/updateDefinition" \
+      --body "$(cat $TMPDIR/${name}_update_body.json)" > /dev/null 2>&1
+    ok "$name updated: $nb_id" >&2
+  else
+    info "Deploying $name..." >&2
+    az rest --method post \
+      --resource "https://api.fabric.microsoft.com" \
+      --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
+      --body "$(cat $TMPDIR/${name}_deploy_body.json)" > /dev/null 2>&1
 
-# Deploy LoadMedicarePartDfiles
-info "Deploying LoadMedicarePartDfiles..."
-az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items" \
-  --body @$TMPDIR/LoadMedicarePartDfiles_deploy_body.json > /dev/null 2>&1
+    # Retry until notebook appears (may take a few seconds after creation)
+    for i in {1..10}; do
+      nb_id=$(az rest --resource "https://api.fabric.microsoft.com" \
+        --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
+        --query "value[?displayName=='$name'].id | [0]" --output tsv 2>/dev/null || echo "")
+      [[ -n "$nb_id" ]] && break
+      sleep 5
+    done
+    [[ -n "$nb_id" ]] || { echo "  ✗ FAILED: Could not retrieve ID for $name after deployment" >&2; exit 1; }
+    ok "$name deployed: $nb_id" >&2
 
-LOAD_NB_ID=$(az rest --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks" \
-  --query "value[?displayName=='LoadMedicarePartDfiles'].id | [0]" --output tsv)
-ok "LoadMedicarePartDfiles deployed: $LOAD_NB_ID"
+    info "Binding $name to lakehouse..." >&2
+    az rest --method post \
+      --resource "https://api.fabric.microsoft.com" \
+      --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$nb_id/updateDefinition" \
+      --body "$(cat $TMPDIR/${name}_update_body.json)" > /dev/null 2>&1
+    ok "$name bound to lakehouse" >&2
+  fi
+  echo "$nb_id"
+}
 
-# Bind both to lakehouse via updateDefinition
-info "Binding notebooks to lakehouse..."
-az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$UNZIP_NB_ID/updateDefinition" \
-  --body @$TMPDIR/UnzipMedicareFiles_update_body.json > /dev/null 2>&1
-ok "UnzipMedicareFiles bound to lakehouse"
+UNZIP_NB_ID=$(deploy_or_update_notebook "UnzipMedicareFiles")
+LOAD_NB_ID=$(deploy_or_update_notebook "LoadMedicarePartDfiles")
 
-az rest --method post \
-  --resource "https://api.fabric.microsoft.com" \
-  --url "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/notebooks/$LOAD_NB_ID/updateDefinition" \
-  --body @$TMPDIR/LoadMedicarePartDfiles_update_body.json > /dev/null 2>&1
-ok "LoadMedicarePartDfiles bound to lakehouse"
+# Checks whether every year's raw CSV has already been unzipped into the
+# lakehouse, so a re-run doesn't redo (or duplicate-run) the unzip job.
+all_raw_csvs_present() {
+  local listing
+  listing=$(curl -s -H "Authorization: Bearer $STORAGE_TOKEN" \
+    -H "x-ms-version: 2023-01-03" \
+    "https://onelake.blob.fabric.microsoft.com/$WS_ID/$LH_ID/Files?restype=container&comp=list&prefix=medicare&maxresults=200")
+  for Y in "${YEARS[@]}"; do
+    echo "$listing" | grep -q "${FILE_PREFIX}_${Y}.csv" || return 1
+  done
+  return 0
+}
 
 # ─── STEP 4: RUN UNZIP NOTEBOOK ─────────────────────────────────────────────
 
 log "Step 4 — Run UnzipMedicareFiles notebook"
 
-UNZIP_JOB_ID=$(submit_notebook_job "$WS_ID" "$UNZIP_NB_ID")
-[[ -n "$UNZIP_JOB_ID" ]] || fail "Could not submit unzip notebook job"
-poll_job "$WS_ID" "$UNZIP_NB_ID" "$UNZIP_JOB_ID" "UnzipMedicareFiles" 60 30
+STORAGE_TOKEN=$(az account get-access-token \
+  --resource "https://storage.azure.com" \
+  --query accessToken --output tsv)
+
+if all_raw_csvs_present; then
+  ok "Raw CSVs for all years (${YEARS[*]}) already present, skipping unzip run"
+else
+  run_notebook_job "$WS_ID" "$UNZIP_NB_ID" "UnzipMedicareFiles" 60 30
+fi
 
 # ─── STEP 5: RUN LOAD NOTEBOOK ──────────────────────────────────────────────
 
 log "Step 5 — Run LoadMedicarePartDfiles notebook"
 
-LOAD_JOB_ID=$(submit_notebook_job "$WS_ID" "$LOAD_NB_ID")
-[[ -n "$LOAD_JOB_ID" ]] || fail "Could not submit load notebook job"
-poll_job "$WS_ID" "$LOAD_NB_ID" "$LOAD_JOB_ID" "LoadMedicarePartDfiles" 120 30
+run_notebook_job "$WS_ID" "$LOAD_NB_ID" "LoadMedicarePartDfiles" 120 30
 
 # ─── STEP 6: VERIFY ─────────────────────────────────────────────────────────
 
