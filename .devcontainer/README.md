@@ -47,15 +47,18 @@ be present in a fresh Codespace. Get them into `data/DemoZippedFiles/` using whi
 Keeps the transfer cloud-to-cloud (CMS → Codespace), so it doesn't go through your home connection.
 
 1. Open the [CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data).
-2. Choose a year, then **right-click the Download button → Copy link address**.
-3. In the Codespace terminal, `curl` it into the data folder with the expected filename:
+2. Choose a year (e.g. **2024**, **2023**, or **2022**), then **right-click the Download button → Copy link address**.
+3. In the Codespace terminal, `curl` it into the data folder with the expected filename. Replace
+   `<paste-the-CMS-download-URL-here>` with the link you just copied — CMS generates that link when
+   you click Download, so it can't be pre-listed here:
 
    ```bash
+   # Example for 2023 — change the year in the filename to match the link you copied.
    curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" \
      "<paste-the-CMS-download-URL-here>"
    ```
 
-4. Repeat for each year you want (1–11 files). Verify:
+4. Repeat for each year you want — for the demo, **2022, 2023, and 2024**. Verify:
 
    ```bash
    ls -lh data/DemoZippedFiles/*.zip

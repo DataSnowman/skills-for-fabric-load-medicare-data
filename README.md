@@ -211,14 +211,17 @@ Because the folder is a normal local path, this is the same directory the script
 
 There's no local browser inside the container, so download **directly into the Codespace** with the
 copied CMS link — this keeps the transfer cloud-to-cloud (CMS → Codespace) instead of routing
-through your home connection:
+through your home connection. Paste the link you copied (right-click Download → Copy link address)
+in place of `<paste-the-CMS-download-URL-here>` — CMS generates this link when you click, so there's
+no fixed URL to hard-code here:
 
 ```bash
+# Repeat per year (2022, 2023, 2024). Copy each year's link from the CMS Download button first.
 curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" \
   "<paste-the-CMS-download-URL-here>"
 ```
 
-Repeat for each year, then verify with `ls -lh data/DemoZippedFiles/*.zip`. Full options (including
+Repeat for each year (e.g. 2022, 2023, 2024), then verify with `ls -lh data/DemoZippedFiles/*.zip`. Full options (including
 uploading zips you already have, or letting an AI agent do the download) are in the
 [Dev Container Quick Start](.devcontainer/README.md#-getting-the-medicare-data-into-the-codespace).
 

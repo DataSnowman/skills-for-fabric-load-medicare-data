@@ -24,7 +24,9 @@ Expected files (2013-2023) — drop in 1 to 11; all present years are picked up 
   Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip
 
 Running in a GitHub Codespace? The zips are gitignored, so they are NOT in the container.
-Fetch them directly, e.g.:
+On the CMS data page, pick a year and right-click the Download button -> Copy link address,
+then paste that link in place of <paste-the-CMS-download-URL-here> (CMS generates the link
+when you click, so there is no fixed URL). Repeat for 2022, 2023, 2024:
   curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" \
     "<paste-the-CMS-download-URL-here>"
 See .devcontainer/README.md ("Getting the Medicare Data into the Codespace") for full options.
