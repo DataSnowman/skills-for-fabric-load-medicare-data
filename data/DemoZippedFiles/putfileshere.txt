@@ -24,9 +24,14 @@ Expected files (2013-2023) — drop in 1 to 11; all present years are picked up 
   Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip
 
 Running in a GitHub Codespace? The zips are gitignored, so they are NOT in the container.
-On the CMS data page, pick a year and right-click the Download button -> Copy link address,
-then paste that link in place of <paste-the-CMS-download-URL-here> (CMS generates the link
-when you click, so there is no fixed URL). Repeat for 2022, 2023, 2024:
+Download them per year with curl. The URL pattern: the MOST RECENT year is the base /data
+path (no year), and OLDER years append /YYYY:
+  # Most recent year (2024) - base /data path, NO year suffix
+  curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2024.zip" \
+    "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data"
+  # Older years - append /YYYY
   curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" \
-    "<paste-the-CMS-download-URL-here>"
+    "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data/2023"
+If a year saves a tiny (~3 KB) HTML file instead of a ~800 MB zip, right-click that year's
+Download button on the CMS data page -> Copy link address, and use that URL instead.
 See .devcontainer/README.md ("Getting the Medicare Data into the Codespace") for full options.

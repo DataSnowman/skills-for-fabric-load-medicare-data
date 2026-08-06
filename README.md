@@ -209,19 +209,29 @@ Because the folder is a normal local path, this is the same directory the script
 
 #### GitHub Codespaces / Dev Container
 
-There's no local browser inside the container, so download **directly into the Codespace** with the
-copied CMS link — this keeps the transfer cloud-to-cloud (CMS → Codespace) instead of routing
-through your home connection. Paste the link you copied (right-click Download → Copy link address)
-in place of `<paste-the-CMS-download-URL-here>` — CMS generates this link when you click, so there's
-no fixed URL to hard-code here:
+There's no local browser inside the container, so download **directly into the Codespace** — this
+keeps the transfer cloud-to-cloud (CMS → Codespace) instead of routing through your home connection.
+The per-year download URL follows a simple pattern: the **most recent year** is the base `.../data`
+path (no year), and **older years** add `/YYYY`:
 
 ```bash
-# Repeat per year (2022, 2023, 2024). Copy each year's link from the CMS Download button first.
+# Most recent year (2024) — note: base /data path, NO year suffix
+curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2024.zip" \
+  "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data"
+
+# Older years — append /YYYY
 curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2023.zip" \
-  "<paste-the-CMS-download-URL-here>"
+  "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data/2023"
+
+curl -L -o "data/DemoZippedFiles/Medicare_Part_D_Prescribers_by_Provider_and_Drug_2022.zip" \
+  "https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data/2022"
 ```
 
-Repeat for each year (e.g. 2022, 2023, 2024), then verify with `ls -lh data/DemoZippedFiles/*.zip`. Full options (including
+> If a year saves a tiny (~3 KB) HTML file instead of a ~800 MB `.zip`, grab the link straight from
+> the page instead: open the [CMS data page](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug/data),
+> **right-click the Download button → Copy link address**, and use that URL.
+
+Verify with `ls -lh data/DemoZippedFiles/*.zip`. Full options (including
 uploading zips you already have, or letting an AI agent do the download) are in the
 [Dev Container Quick Start](.devcontainer/README.md#-getting-the-medicare-data-into-the-codespace).
 
